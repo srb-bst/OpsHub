@@ -1,11 +1,16 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import { BlueSheetList } from "@/components/blue-sheet-list"
 
-export default function BlueSheetsPage() {
-  const searchParams = useSearchParams()
-  const filter = searchParams.get("filter")
+function BlueSheetsContent() {
+  return <BlueSheetList />
+}
 
-  return <BlueSheetList initialFilter={filter} />
+export default function BlueSheetsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <BlueSheetsContent />
+    </Suspense>
+  )
 }
