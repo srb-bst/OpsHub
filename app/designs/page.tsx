@@ -1,5 +1,10 @@
-import { EnhancedDesignList } from "@/components/enhanced-design-list"
+import { DesignListReal } from "@/components/design-list-real"
 
 export default function DesignsPage() {
-  return <EnhancedDesignList />
+  return (
+    <div>
+      <h1>Designs</h1>
+      <DesignListReal />
+    </div>
+  )
 }

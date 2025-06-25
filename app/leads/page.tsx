@@ -1,11 +1,10 @@
-"use client"
-
-import { useSearchParams } from "next/navigation"
-import { LeadManagement } from "@/components/lead-management"
+import { LeadManagementFixed } from "@/components/lead-management-fixed"
 
 export default function LeadsPage() {
-  const searchParams = useSearchParams()
-  const filter = searchParams.get("filter")
-
-  return <LeadManagement initialFilter={filter} />
+  return (
+    <div>
+      <h1>Leads Page</h1>
+      <LeadManagementFixed />
+    </div>
+  )
 }

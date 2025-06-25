@@ -1,7 +1,10 @@
-"use client"
-
-import { EstimateList } from "@/components/estimate-list"
+import { EstimateListReal } from "@/components/estimate-list-real"
 
 export default function EstimatesPage() {
-  return <EstimateList />
+  return (
+    <div>
+      <h1>Estimates</h1>
+      <EstimateListReal />
+    </div>
+  )
 }
