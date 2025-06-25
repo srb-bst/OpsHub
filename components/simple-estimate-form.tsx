@@ -3,10 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Upload, Save, FileText, X, DollarSign } from "lucide-react"
-import Link from "next/link"
-import { useSearchParams, useRouter } from "next/navigation"
-
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,404 +11,390 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase"
+import { Upload, FileText, X } from "lucide-react"
 
-interface DesignProject {
-  id: string
-  customer_id: string
-  title: string
-  project_type: string
-  area: string
-  customer_name?: string
-  customer_email?: string
-  customer_phone?: string
-  customer_address?: string
+interface SimpleEstimateFormProps {
+  designProjectId?: string
+  customerName?: string
+  projectTitle?: string
 }
 
-interface UploadedFile {
-  name: string
-  size: number
-  url: string
-  type: string
-}
-
-export function SimpleEstimateForm() {
-  const searchParams = useSearchParams()
+export function SimpleEstimateForm({ designProjectId, customerName, projectTitle }: SimpleEstimateFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const designId = searchParams.get("design")
-
-  const [selectedDesign, setSelectedDesign] = useState<DesignProject | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-
-  // Form fields
-  const [estimateTotal, setEstimateTotal] = useState("")
-  const [status, setStatus] = useState("draft")
-  const [notes, setNotes] = useState("")
-  const [uploadedPDF, setUploadedPDF] = useState<UploadedFile | null>(null)
+  const [designProject, setDesignProject] = useState<any>(null)
+  const [loadingDesign, setLoadingDesign] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [formData, setFormData] = useState({
+    customerName: customerName || "",
+    projectTitle: projectTitle || "",
+    totalAmount: "",
+    notes: "",
+    status: "draft" as const,
+  })
 
   useEffect(() => {
     if (designId) {
-      fetchDesignData()
-    } else {
-      setLoading(false)
+      fetchDesignProject(designId)
     }
   }, [designId])
 
-  const fetchDesignData = async () => {
+  const fetchDesignProject = async (id: string) => {
+    setLoadingDesign(true)
     try {
-      const { data: designData, error } = await supabase.from("design_projects").select("*").eq("id", designId).single()
+      const { data, error } = await supabase.from("design_projects").select("*").eq("id", id).single()
 
       if (error) throw error
-      setSelectedDesign(designData)
+
+      if (data) {
+        setDesignProject(data)
+        // Populate customer information from design project
+        setFormData((prev) => ({
+          ...prev,
+          customerName: data.customer_name || "",
+          projectTitle: data.title || "",
+        }))
+      }
     } catch (error) {
-      console.error("Error fetching design data:", error)
+      console.error("Error fetching design project:", error)
     } finally {
-      setLoading(false)
+      setLoadingDesign(false)
     }
   }
 
-  const handlePDFUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return
-
-    if (file.type !== "application/pdf") {
-      alert("Please upload a PDF file only")
-      return
+    if (file) {
+      console.log("📁 File selected:", file.name, file.type, file.size)
+      if (file.type === "application/pdf") {
+        setUploadedFile(file)
+      } else {
+        alert("Please upload a PDF file only")
+        event.target.value = ""
+      }
     }
+  }
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert("File size must be less than 10MB")
-      return
-    }
+  const removeFile = () => {
+    setUploadedFile(null)
+    setUploadProgress(0)
+  }
 
-    setUploading(true)
+  const uploadFileToStorage = async (file: File): Promise<{ filename: string; url: string } | null> => {
     try {
-      // For demo purposes, just store file metadata without blob URL
-      setUploadedPDF({
+      console.log("🔄 Starting file upload to Supabase storage...")
+      console.log("📁 File details:", {
         name: file.name,
-        size: file.size,
-        url: "", // No URL in demo environment
         type: file.type,
+        size: file.size,
       })
-    } catch (error) {
-      console.error("Error uploading file:", error)
-      alert("Error uploading file. Please try again.")
-    } finally {
-      setUploading(false)
-    }
-  }
 
-  const removePDF = () => {
-    setUploadedPDF(null)
-  }
+      // Create a unique filename
+      const timestamp = Date.now()
+      const filename = `estimate_${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
+      console.log("📁 Uploading as:", filename)
 
-  const handleSaveEstimate = async () => {
-    if (!estimateTotal || Number.parseFloat(estimateTotal) <= 0) {
-      alert("Please enter a valid estimate total")
-      return
-    }
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage.from("estimates").upload(filename, file, {
+        cacheControl: "3600",
+        upsert: false,
+      })
 
-    if (!selectedDesign) {
-      alert("Please select a design project first")
-      return
-    }
-
-    setSaving(true)
-    try {
-      const estimateNumber = `EST-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-      const total = Number.parseFloat(estimateTotal)
-
-      // Create estimate
-      const { data: estimateData, error: estimateError } = await supabase
-        .from("estimates")
-        .insert({
-          design_project_id: selectedDesign.id,
-          estimate_number: estimateNumber,
-          customer_name: selectedDesign.customer_name || "Unknown Customer",
-          project_title: selectedDesign.title,
-          status: status,
-          total_amount: total,
-          subtotal: total,
-          markup_percentage: 0,
-          markup_amount: 0,
-          tax_percentage: 0,
-          tax_amount: 0,
-          notes: notes,
-          pdf_filename: uploadedPDF?.name || null,
-          pdf_url: uploadedPDF?.url || null,
+      if (error) {
+        console.error("❌ Storage upload error:", error)
+        console.error("❌ Error details:", {
+          message: error.message,
+          statusCode: error.statusCode,
+          error: error.error,
         })
-        .select()
-        .single()
 
-      if (estimateError) throw estimateError
-
-      // Update design status based on estimate status
-      let newDesignStatus = "needs-estimate"
-      if (status === "sent-to-customer" || status === "under-negotiation") {
-        newDesignStatus = "pending-approval"
-      } else if (status === "approved") {
-        newDesignStatus = "approved"
+        // Provide specific error messages
+        if (error.message?.includes("Bucket not found")) {
+          throw new Error("Storage bucket not found. Please contact support.")
+        } else if (error.message?.includes("File size")) {
+          throw new Error("File is too large. Maximum size is 10MB.")
+        } else if (error.message?.includes("mime type")) {
+          throw new Error("Invalid file type. Only PDF files are allowed.")
+        } else {
+          throw new Error(`Upload failed: ${error.message}`)
+        }
       }
 
-      const { error: updateError } = await supabase
-        .from("design_projects")
-        .update({ status: newDesignStatus })
-        .eq("id", selectedDesign.id)
+      console.log("✅ File uploaded successfully:", data)
 
-      if (updateError) throw updateError
+      // Get the public URL
+      const { data: urlData } = supabase.storage.from("estimates").getPublicUrl(filename)
 
-      alert(`✅ Estimate ${estimateNumber} saved successfully!`)
-      router.push("/estimates")
+      console.log("🔗 Public URL:", urlData.publicUrl)
+
+      return {
+        filename: filename,
+        url: urlData.publicUrl,
+      }
     } catch (error) {
-      console.error("Error saving estimate:", error)
-      alert("❌ Error saving estimate")
-    } finally {
-      setSaving(false)
+      console.error("❌ File upload failed:", error)
+      return null
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading design data...</p>
-        </div>
-      </div>
-    )
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      console.log("🔄 Starting estimate creation...")
+      console.log("📋 Form data:", formData)
+      console.log("📁 File to upload:", uploadedFile?.name)
+
+      let fileData = null
+
+      // Upload file if one was selected
+      if (uploadedFile) {
+        console.log("🔄 Uploading file first...")
+        setUploadProgress(25)
+
+        try {
+          fileData = await uploadFileToStorage(uploadedFile)
+
+          if (!fileData) {
+            alert("Failed to upload file. Please check the console for details and try again.")
+            setLoading(false)
+            return
+          }
+        } catch (error) {
+          alert(`File upload failed: ${error.message}`)
+          setLoading(false)
+          return
+        }
+
+        setUploadProgress(50)
+        console.log("✅ File uploaded:", fileData)
+      }
+
+      setUploadProgress(75)
+
+      // Create the estimate record
+      const estimateData = {
+        design_project_id: designId || designProjectId || null,
+        estimate_number: `EST-${Date.now()}`,
+        customer_name: formData.customerName,
+        project_title: formData.projectTitle,
+        status: formData.status,
+        total_amount: Number.parseFloat(formData.totalAmount),
+        notes: formData.notes,
+        pdf_filename: fileData?.filename || null,
+        pdf_url: fileData?.url || null,
+        created_at: new Date().toISOString(),
+      }
+
+      console.log("💾 Saving estimate:", estimateData)
+
+      const { data, error } = await supabase.from("estimates").insert([estimateData]).select().single()
+
+      if (error) {
+        console.error("❌ Database error:", error)
+        throw error
+      }
+
+      console.log("✅ Estimate saved:", data)
+      setUploadProgress(100)
+
+      // Update design project status if applicable
+      if (designProjectId) {
+        console.log("🔄 Updating design project status...")
+        const { error: updateError } = await supabase
+          .from("design_projects")
+          .update({ status: "estimate_created" })
+          .eq("id", designProjectId)
+
+        if (updateError) {
+          console.error("⚠️ Failed to update design project status:", updateError)
+        } else {
+          console.log("✅ Design project status updated")
+        }
+      }
+
+      alert("Estimate saved successfully!")
+      router.push(`/estimates/${data.id}`)
+    } catch (error) {
+      console.error("❌ Error saving estimate:", error)
+      alert("Failed to save estimate. Please try again.")
+    } finally {
+      setLoading(false)
+      setUploadProgress(0)
+    }
   }
 
+  const amounts = null
+
   return (
-    <div className="p-4 lg:p-8 bg-slate-50/30 min-h-screen lg:ml-0">
-      <div className="max-w-4xl mx-auto pt-16 lg:pt-0">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button asChild variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-lg hover:bg-white/80">
-            <Link href="/estimates">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl lg:text-3xl font-semibold text-slate-900 mb-1">Create New Estimate</h1>
-            <p className="text-slate-600">
-              {selectedDesign ? `For ${selectedDesign.title}` : "Upload UDS estimate and set total"}
-            </p>
-          </div>
-        </div>
+    <div className="max-w-2xl mx-auto p-6">
+      <Card className="bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none">
+        <CardHeader className="p-6 pb-4">
+          <CardTitle className="text-xl font-semibold text-slate-900">Create Estimate</CardTitle>
+          <p className="text-sm text-slate-600">Upload UDS estimate and set total amount</p>
+          {designProject && (
+            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+              <FileText className="h-4 w-4" />
+              <span>From Design Project: {designProject.title}</span>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="p-6 pt-0">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Customer & Project Info */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="customerName" className="text-sm font-medium text-slate-700">
+                  Customer Name
+                </Label>
+                <Input
+                  id="customerName"
+                  value={formData.customerName}
+                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                  className="mt-1 rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="projectTitle" className="text-sm font-medium text-slate-700">
+                  Project Title
+                </Label>
+                <Input
+                  id="projectTitle"
+                  value={formData.projectTitle}
+                  onChange={(e) => setFormData({ ...formData, projectTitle: e.target.value })}
+                  className="mt-1 rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                  required
+                />
+              </div>
+            </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Design Project Info */}
-            {selectedDesign && (
-              <Card className="bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none">
-                <CardHeader className="p-4 lg:p-6 pb-4">
-                  <CardTitle className="text-lg font-semibold text-slate-900">Project Information</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 lg:p-6 pt-0">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-slate-500">Customer:</span>
-                      <span className="ml-2 text-slate-900 font-medium">
-                        {selectedDesign.customer_name || "Unknown Customer"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Project:</span>
-                      <span className="ml-2 text-slate-900">{selectedDesign.title}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Type:</span>
-                      <span className="ml-2 text-slate-900">{selectedDesign.project_type}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Area:</span>
-                      <span className="ml-2 text-slate-900">{selectedDesign.area}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* PDF Upload */}
-            <Card className="bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none">
-              <CardHeader className="p-4 lg:p-6 pb-4">
-                <CardTitle className="text-lg font-semibold text-slate-900">UDS Estimate PDF</CardTitle>
-                <p className="text-sm text-slate-600">Upload the estimate PDF generated from UDS</p>
-              </CardHeader>
-              <CardContent className="p-4 lg:p-6 pt-0">
-                {!uploadedPDF ? (
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-6">
-                    <div className="text-center">
-                      <Upload className="mx-auto h-12 w-12 text-slate-400" />
-                      <div className="mt-4">
-                        <Label htmlFor="pdf-upload" className="cursor-pointer">
-                          <span className="mt-2 block text-sm font-medium text-slate-900">Click to upload PDF</span>
-                          <span className="mt-1 block text-sm text-slate-500">PDF files up to 10MB</span>
-                        </Label>
-                        <Input
-                          id="pdf-upload"
-                          type="file"
-                          accept=".pdf"
-                          onChange={handlePDFUpload}
-                          disabled={uploading}
-                          className="hidden"
-                        />
-                      </div>
-                      {uploading && (
-                        <div className="mt-4">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500 mx-auto"></div>
-                          <p className="text-sm text-slate-500 mt-2">Uploading...</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <FileText className="h-8 w-8 text-red-500" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{uploadedPDF.name}</p>
-                        <p className="text-sm text-slate-500">{formatFileSize(uploadedPDF.size)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={removePDF}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Estimate Details */}
-            <Card className="bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none">
-              <CardHeader className="p-4 lg:p-6 pb-4">
-                <CardTitle className="text-lg font-semibold text-slate-900">Estimate Details</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 lg:p-6 pt-0 space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="estimateTotal" className="text-sm font-medium text-slate-700">
-                      Total Amount *
-                    </Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        id="estimateTotal"
-                        type="number"
-                        step="0.01"
-                        value={estimateTotal}
-                        onChange={(e) => setEstimateTotal(e.target.value)}
-                        placeholder="0.00"
-                        className="h-12 pl-10 text-base rounded-lg border-slate-200"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="status" className="text-sm font-medium text-slate-700">
-                      Status
-                    </Label>
-                    <Select value={status} onValueChange={setStatus}>
-                      <SelectTrigger className="h-12 text-base rounded-lg border-slate-200">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="internal-review">Internal Review</SelectItem>
-                        <SelectItem value="sent-to-customer">Sent to Customer</SelectItem>
-                        <SelectItem value="under-negotiation">Under Negotiation</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="notes" className="text-sm font-medium text-slate-700">
-                    Notes
-                  </Label>
-                  <Textarea
-                    id="notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Additional notes about this estimate..."
-                    rows={3}
-                    className="text-base rounded-lg border-slate-200"
+            {/* File Upload */}
+            <div>
+              <Label className="text-sm font-medium text-slate-700 mb-2 block">UDS Estimate PDF</Label>
+              {!uploadedFile ? (
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-emerald-400 transition-colors">
+                  <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600 mb-2">Click to upload or drag and drop</p>
+                  <p className="text-xs text-slate-500">PDF files only, max 10MB</p>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileUpload}
+                    className="mt-2 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                   />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              ) : (
+                <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-6 w-6 text-emerald-600" />
+                    <div>
+                      <p className="text-sm font-medium text-emerald-900">{uploadedFile.name}</p>
+                      <p className="text-xs text-emerald-700">{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeFile}
+                    className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="mt-2">
+                  <div className="bg-slate-200 rounded-full h-2">
+                    <div
+                      className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1">Uploading... {uploadProgress}%</p>
+                </div>
+              )}
+            </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Summary */}
-            <Card className="bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none">
-              <CardHeader className="p-4 lg:p-6 pb-4">
-                <CardTitle className="text-lg font-semibold text-slate-900">Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 lg:p-6 pt-0 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">PDF Uploaded:</span>
-                  <span className={uploadedPDF ? "text-green-600" : "text-slate-400"}>
-                    {uploadedPDF ? "✓ Yes" : "✗ No"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">Total Amount:</span>
-                  <span className="font-medium text-slate-900">
-                    {estimateTotal ? `$${Number.parseFloat(estimateTotal).toFixed(2)}` : "$0.00"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">Status:</span>
-                  <span className="font-medium text-slate-900 capitalize">{status.replace("-", " ")}</span>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Total Amount */}
+            <div>
+              <Label htmlFor="totalAmount" className="text-sm font-medium text-slate-700">
+                Total Amount ($)
+              </Label>
+              <Input
+                id="totalAmount"
+                type="number"
+                step="0.01"
+                value={formData.totalAmount}
+                onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
+                className="mt-1 rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                required
+              />
+            </div>
 
-            {/* Actions */}
-            <Card className="bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none">
-              <CardHeader className="p-4 lg:p-6 pb-4">
-                <CardTitle className="text-lg font-semibold text-slate-900">Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 lg:p-6 pt-0 space-y-3">
-                <Button
-                  onClick={handleSaveEstimate}
-                  disabled={!selectedDesign || !estimateTotal || saving}
-                  className="w-full h-12 text-base font-medium bg-emerald-500 hover:bg-emerald-600 rounded-lg"
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="status" className="text-sm font-medium text-slate-700">
+                  Status
+                </Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value as any })}
                 >
-                  <Save className="mr-2 h-5 w-5" />
-                  {saving ? "Saving..." : "Save Estimate"}
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="w-full h-12 text-base font-medium rounded-lg border-slate-200"
-                >
-                  <Link href="/estimates">Cancel</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+                  <SelectTrigger className="mt-1 rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="internal-review">Internal Review</SelectItem>
+                    <SelectItem value="sent-to-customer">Sent to Customer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label htmlFor="notes" className="text-sm font-medium text-slate-700">
+                Notes
+              </Label>
+              <Textarea
+                id="notes"
+                rows={3}
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="mt-1 rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                placeholder="Additional notes about the estimate..."
+              />
+            </div>
+
+            {/* Submit */}
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                className="flex-1 h-12 rounded-lg border-slate-200 hover:bg-slate-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading || !formData.customerName || !formData.projectTitle || !formData.totalAmount}
+                className="flex-1 h-12 bg-emerald-500 hover:bg-emerald-600 rounded-lg"
+              >
+                {loading ? "Saving..." : "Save Estimate"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

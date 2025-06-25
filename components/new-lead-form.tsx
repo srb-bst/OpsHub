@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { ArrowLeft, Camera, MapPin, Phone, User, Building, Globe } from "lucide-react"
+import { ArrowLeft, MapPin, Phone, User, Building, Globe } from "lucide-react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
@@ -14,10 +14,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { supabase } from "@/lib/supabase"
 
 export function NewLeadForm() {
   const [leadSource, setLeadSource] = useState<string>("")
   const [services, setServices] = useState<string[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleServiceChange = (service: string, checked: boolean) => {
     if (checked) {
@@ -29,35 +31,70 @@ export function NewLeadForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
 
     try {
       // Get form data
       const formData = new FormData(e.target as HTMLFormElement)
+
+      // First, create or find the customer
+      const customerData = {
+        first_name: formData.get("firstName") as string,
+        last_name: formData.get("lastName") as string,
+        phone: formData.get("phone") as string,
+        email: formData.get("email") as string,
+        address: formData.get("address") as string,
+        created_at: new Date().toISOString(),
+      }
+
+      console.log("Creating customer:", customerData)
+
+      const { data: customer, error: customerError } = await supabase
+        .from("customers")
+        .insert(customerData)
+        .select()
+        .single()
+
+      if (customerError) {
+        console.error("Customer creation error:", customerError)
+        alert("Error creating customer: " + customerError.message)
+        return
+      }
+
+      console.log("✅ Customer created:", customer)
+
+      // Now create the lead
       const leadData = {
-        customer_name: `${formData.get("firstName")} ${formData.get("lastName")}`,
-        customer_phone: formData.get("phone"),
-        customer_email: formData.get("email"),
-        customer_address: formData.get("address"),
+        customer_id: customer.id,
         source: leadSource,
         services: services,
-        description: formData.get("description"),
-        budget_range: formData.get("budget"),
-        timeline: formData.get("timeline"),
-        priority: formData.get("priority") || "medium",
+        description: formData.get("description") as string,
         status: "new",
-        notes: formData.get("notes"),
+        priority: (formData.get("priority") as string) || "medium",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }
 
       console.log("Creating lead:", leadData)
 
-      // TODO: Save to database
-      // const { data, error } = await supabase.from('leads').insert(leadData)
+      const { data: lead, error: leadError } = await supabase.from("leads").insert(leadData).select().single()
 
-      // For now, just redirect back to leads
+      if (leadError) {
+        console.error("Lead creation error:", leadError)
+        alert("Error creating lead: " + leadError.message)
+        return
+      }
+
+      console.log("✅ Lead created successfully:", lead)
+      alert("Lead created successfully!")
+
+      // Redirect back to leads page
       window.location.href = "/leads"
     } catch (error) {
       console.error("Error creating lead:", error)
       alert("Error creating lead. Please try again.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -87,9 +124,10 @@ export function NewLeadForm() {
                 value={leadSource}
                 onValueChange={setLeadSource}
                 className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+                required
               >
                 <div className="flex items-center space-x-3 p-4 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
-                  <RadioGroupItem value="website" id="website" />
+                  <RadioGroupItem value="Website" id="website" />
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-slate-500" />
                     <Label htmlFor="website" className="text-sm font-medium cursor-pointer">
@@ -98,7 +136,7 @@ export function NewLeadForm() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-3 p-4 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
-                  <RadioGroupItem value="phone" id="phone" />
+                  <RadioGroupItem value="Phone Call" id="phone" />
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-slate-500" />
                     <Label htmlFor="phone" className="text-sm font-medium cursor-pointer">
@@ -107,7 +145,7 @@ export function NewLeadForm() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-3 p-4 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
-                  <RadioGroupItem value="nursery" id="nursery" />
+                  <RadioGroupItem value="Nursery Walk-in" id="nursery" />
                   <div className="flex items-center gap-2">
                     <Building className="h-4 w-4 text-slate-500" />
                     <Label htmlFor="nursery" className="text-sm font-medium cursor-pointer">
@@ -116,7 +154,7 @@ export function NewLeadForm() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-3 p-4 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
-                  <RadioGroupItem value="referral" id="referral" />
+                  <RadioGroupItem value="Referral" id="referral" />
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-slate-500" />
                     <Label htmlFor="referral" className="text-sm font-medium cursor-pointer">
@@ -137,23 +175,25 @@ export function NewLeadForm() {
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="firstName" className="text-sm font-medium text-slate-700">
-                    First Name
+                    First Name *
                   </Label>
                   <Input
                     id="firstName"
                     name="firstName"
                     placeholder="First name"
+                    required
                     className="h-12 text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName" className="text-sm font-medium text-slate-700">
-                    Last Name
+                    Last Name *
                   </Label>
                   <Input
                     id="lastName"
                     name="lastName"
                     placeholder="Last name"
+                    required
                     className="h-12 text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                   />
                 </div>
@@ -162,13 +202,14 @@ export function NewLeadForm() {
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="phone" className="text-sm font-medium text-slate-700">
-                    Phone Number
+                    Phone Number *
                   </Label>
                   <Input
                     id="phone"
                     name="phone"
                     type="tel"
                     placeholder="(555) 123-4567"
+                    required
                     className="h-12 text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                   />
                 </div>
@@ -294,30 +335,13 @@ export function NewLeadForm() {
                   className="text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-slate-700">Site Photos (Optional)</Label>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Button
-                    variant="outline"
-                    className="h-24 border-2 border-dashed border-slate-300 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 flex flex-col items-center justify-center gap-2"
-                    onClick={() => {
-                      // Handle photo capture/upload
-                      console.log("Photo capture clicked")
-                    }}
-                  >
-                    <Camera className="h-6 w-6 text-slate-400" />
-                    <span className="text-xs text-slate-500">Take Photo</span>
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
           {/* Priority and Notes */}
           <Card className="bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none">
             <CardHeader className="p-4 lg:p-6 pb-4">
-              <CardTitle className="text-lg font-semibold text-slate-900">Lead Priority & Notes</CardTitle>
+              <CardTitle className="text-lg font-semibold text-slate-900">Lead Priority</CardTitle>
             </CardHeader>
             <CardContent className="p-4 lg:p-6 pt-0 space-y-4">
               <div className="space-y-2">
@@ -346,19 +370,6 @@ export function NewLeadForm() {
                   </div>
                 </RadioGroup>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes" className="text-sm font-medium text-slate-700">
-                  Initial Notes
-                </Label>
-                <Textarea
-                  id="notes"
-                  name="notes"
-                  placeholder="Add any additional notes about this lead..."
-                  rows={3}
-                  className="text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
-                />
-              </div>
             </CardContent>
           </Card>
 
@@ -368,14 +379,16 @@ export function NewLeadForm() {
               variant="outline"
               asChild
               className="flex-1 h-12 text-base font-medium rounded-lg border-slate-200 hover:bg-slate-50"
+              disabled={isSubmitting}
             >
               <Link href="/leads">Cancel</Link>
             </Button>
-            <Button className="flex-1 h-12 text-base font-medium bg-emerald-500 hover:bg-emerald-600 rounded-lg">
-              Save Lead
-            </Button>
-            <Button className="flex-1 h-12 text-base font-medium bg-blue-500 hover:bg-blue-600 rounded-lg">
-              Save & Assign
+            <Button
+              type="submit"
+              className="flex-1 h-12 text-base font-medium bg-emerald-500 hover:bg-emerald-600 rounded-lg"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Saving..." : "Save Lead"}
             </Button>
           </div>
         </form>

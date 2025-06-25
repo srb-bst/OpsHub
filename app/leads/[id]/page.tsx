@@ -1,117 +1,111 @@
-import { notFound } from "next/navigation"
+"use client"
+
+import { useState, useEffect } from "react"
+import { notFound, useParams } from "next/navigation"
 import { LeadDetailPage } from "@/components/lead-detail-page"
+import { supabase } from "@/lib/supabase"
 
-// Mock lead data - in real app this would come from database
-const mockLeads = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    phone: "(555) 123-4567",
-    email: "sarah.johnson@email.com",
-    address: "123 Oak Street, Springfield",
-    source: "Website Inquiry",
-    services: ["Design", "Installation"],
-    description: "Looking for front yard redesign with low-maintenance plants",
-    timeAgo: "3 days ago",
-    status: "contacted",
-    priority: "high",
-    lastContact: "2024-01-15T10:00:00Z",
-    assignedTo: "Emma Thompson",
-    budget: "$5,000 - $10,000",
-    timeline: "Spring 2024",
-    notes: "Customer mentioned they travel frequently and want low-maintenance options. Interested in native plants.",
-    createdAt: "2024-01-12T09:00:00Z",
-    updatedAt: "2024-01-15T10:00:00Z",
-  },
-  {
-    id: "2",
-    name: "Mike Chen",
-    phone: "(555) 234-5678",
-    email: "mike.chen@email.com",
-    address: "456 Maple Drive, Springfield",
-    source: "Nursery Walk-in",
-    services: ["Delivery", "Installation"],
-    description: "Purchased 15 shrubs, needs delivery and planting this week",
-    timeAgo: "4 days ago",
-    status: "contacted",
-    priority: "medium",
-    lastContact: "2024-01-14T14:30:00Z",
-    assignedTo: "David Wilson",
-    budget: "$2,000 - $3,000",
-    timeline: "This week",
-    notes: "Already purchased plants from nursery. Just needs installation service.",
-    createdAt: "2024-01-10T14:00:00Z",
-    updatedAt: "2024-01-14T14:30:00Z",
-  },
-  {
-    id: "3",
-    name: "Jennifer Martinez",
-    phone: "(555) 345-6789",
-    email: "jennifer.martinez@email.com",
-    address: "789 Pine Road, Springfield",
-    source: "Referral",
-    services: ["Design", "Hardscape"],
-    description: "Complete backyard renovation including patio and landscaping",
-    timeAgo: "1 day ago",
-    status: "new",
-    priority: "high",
-    budget: "$15,000 - $25,000",
-    timeline: "Summer 2024",
-    notes: "Referred by previous customer. Large project with hardscaping needs.",
-    createdAt: "2024-01-17T11:00:00Z",
-    updatedAt: "2024-01-17T11:00:00Z",
-  },
-  {
-    id: "4",
-    name: "Robert Wilson",
-    phone: "(555) 456-7890",
-    email: "robert.wilson@email.com",
-    address: "321 Cedar Lane, Springfield",
-    source: "Phone Inquiry",
-    services: ["Design", "Installation"],
-    description: "Interested in drought-resistant landscaping for large property",
-    timeAgo: "2 hours ago",
-    status: "assigned",
-    assignedTo: "Emma Thompson",
-    priority: "medium",
-    lastContact: "2024-01-18T16:00:00Z",
-    budget: "$8,000 - $12,000",
-    timeline: "Fall 2024",
-    notes: "Large property with water restrictions. Needs drought-tolerant design.",
-    createdAt: "2024-01-18T14:00:00Z",
-    updatedAt: "2024-01-18T16:00:00Z",
-  },
-  {
-    id: "5",
-    name: "Linda Davis",
-    phone: "(555) 567-9012",
-    email: "linda.davis@email.com",
-    address: "987 Elm Court, Springfield",
-    source: "Online Ad",
-    services: ["Hardscape", "Installation"],
-    description: "Needs a retaining wall and paver patio installed",
-    timeAgo: "1 week ago",
-    status: "consultation-needed",
-    priority: "high",
-    budget: "$10,000 - $15,000",
-    timeline: "Spring 2024",
-    notes: "Ready to move forward with consultation. Has specific design ideas.",
-    createdAt: "2024-01-11T10:00:00Z",
-    updatedAt: "2024-01-11T10:00:00Z",
-  },
-]
+export default function LeadDetailPageRoute() {
+  const params = useParams()
+  const [lead, setLead] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-interface LeadDetailPageProps {
-  params: {
-    id: string
+  useEffect(() => {
+    async function fetchLead() {
+      try {
+        setLoading(true)
+
+        // Fetch lead
+        const { data: leadData, error: leadError } = await supabase
+          .from("leads")
+          .select("*")
+          .eq("id", params.id)
+          .single()
+
+        if (leadError) {
+          console.error("Lead error:", leadError)
+          setError(true)
+          return
+        }
+
+        // Fetch customer separately
+        const { data: customerData, error: customerError } = await supabase
+          .from("customers")
+          .select("*")
+          .eq("id", leadData.customer_id)
+          .single()
+
+        if (customerError) {
+          console.error("Customer error:", customerError)
+        }
+
+        // Transform the data
+        const transformedLead = {
+          id: leadData.id.toString(),
+          name: customerData ? `${customerData.first_name} ${customerData.last_name}` : "Unknown Customer",
+          phone: customerData?.phone || "",
+          email: customerData?.email || "",
+          address: customerData?.address || "",
+          source: leadData.source || "Unknown",
+          services: leadData.services || [],
+          description: leadData.description || "",
+          timeAgo: getTimeAgo(leadData.created_at),
+          status: leadData.status || "new",
+          priority: leadData.priority || "medium",
+          budget: leadData.budget || "",
+          timeline: leadData.timeline || "",
+          notes: leadData.notes || "",
+          createdAt: leadData.created_at,
+          updatedAt: leadData.updated_at || leadData.created_at,
+        }
+
+        setLead(transformedLead)
+      } catch (error) {
+        console.error("Error fetching lead:", error)
+        setError(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (params.id) {
+      fetchLead()
+    }
+  }, [params.id])
+
+  function getTimeAgo(dateString) {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+
+    if (diffInHours < 1) return "Less than an hour ago"
+    if (diffInHours < 24) return `${diffInHours} hours ago`
+
+    const diffInDays = Math.floor(diffInHours / 24)
+    if (diffInDays === 1) return "1 day ago"
+    if (diffInDays < 7) return `${diffInDays} days ago`
+
+    const diffInWeeks = Math.floor(diffInDays / 7)
+    if (diffInWeeks === 1) return "1 week ago"
+    return `${diffInWeeks} weeks ago`
   }
-}
 
-export default function LeadDetailPageRoute({ params }: LeadDetailPageProps) {
-  const lead = mockLeads.find((l) => l.id === params.id)
+  if (loading) {
+    return (
+      <div className="p-4 lg:p-8 bg-slate-50/30 min-h-screen lg:ml-0">
+        <div className="max-w-4xl mx-auto pt-16 lg:pt-0">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+            <p className="mt-4 text-slate-600">Loading lead details...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-  if (!lead) {
-    notFound()
+  if (error || !lead) {
+    return notFound()
   }
 
   return <LeadDetailPage lead={lead} />

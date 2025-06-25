@@ -1,13 +1,13 @@
-"use client"
-
+import { use } from "react"
 import { EstimateDetail } from "@/components/estimate-detail"
 
 interface EstimateDetailPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default function EstimateDetailPage({ params }: EstimateDetailPageProps) {
-  return <EstimateDetail estimateId={params.id} />
+  const { id } = use(params)
+  return <EstimateDetail estimateId={id} />
 }

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Filter, Plus, Search, User, Phone, MapPin, Clock, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { supabase } from "@/lib/supabase"
 
 export function LeadManagement() {
   const searchParams = useSearchParams()
@@ -21,79 +22,86 @@ export function LeadManagement() {
   const [selectedLead, setSelectedLead] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
+  const [leads, setLeads] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Mock leads with realistic overdue data
-  const mockLeads = [
-    {
-      id: "1",
-      name: "Sarah Johnson",
-      phone: "(555) 123-4567",
-      address: "123 Oak Street, Springfield",
-      source: "Website Inquiry",
-      services: ["Design", "Installation"],
-      description: "Looking for front yard redesign with low-maintenance plants",
-      timeAgo: "3 days ago",
-      status: "contacted",
-      priority: "high",
-      lastContact: "2024-01-15T10:00:00Z", // 3+ days ago - overdue
-      assignedTo: "Emma Thompson",
-    },
-    {
-      id: "2",
-      name: "Mike Chen",
-      phone: "(555) 234-5678",
-      address: "456 Maple Drive, Springfield",
-      source: "Nursery Walk-in",
-      services: ["Delivery", "Installation"],
-      description: "Purchased 15 shrubs, needs delivery and planting this week",
-      timeAgo: "4 days ago",
-      status: "contacted",
-      priority: "medium",
-      lastContact: "2024-01-14T14:30:00Z", // 4+ days ago - overdue
-      assignedTo: "David Wilson",
-    },
-    {
-      id: "3",
-      name: "Jennifer Martinez",
-      phone: "(555) 345-6789",
-      address: "789 Pine Road, Springfield",
-      source: "Referral",
-      services: ["Design", "Hardscape"],
-      description: "Complete backyard renovation including patio and landscaping",
-      timeAgo: "1 day ago",
-      status: "new",
-      priority: "high",
-    },
-    {
-      id: "4",
-      name: "Robert Wilson",
-      phone: "(555) 456-7890",
-      address: "321 Cedar Lane, Springfield",
-      source: "Phone Inquiry",
-      services: ["Design", "Installation"],
-      description: "Interested in drought-resistant landscaping for large property",
-      timeAgo: "2 hours ago",
-      status: "assigned",
-      assignedTo: "Emma Thompson",
-      priority: "medium",
-      lastContact: "2024-01-18T16:00:00Z", // Recent
-    },
-    {
-      id: "5",
-      name: "Linda Davis",
-      phone: "(555) 567-9012",
-      address: "987 Elm Court, Springfield",
-      source: "Online Ad",
-      services: ["Hardscape", "Installation"],
-      description: "Needs a retaining wall and paver patio installed",
-      timeAgo: "1 week ago",
-      status: "consultation-needed",
-      priority: "high",
-    },
-  ]
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Fetch leads
+      const { data: leadsData, error: leadsError } = await supabase
+        .from("leads")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      // Fetch customers
+      const { data: customersData, error: customersError } = await supabase.from("customers").select("*")
+
+      if (leadsError) {
+        console.error("Leads error:", leadsError)
+        setError("Error loading leads: " + leadsError.message)
+        return
+      }
+
+      if (customersError) {
+        console.error("Customers error:", customersError)
+        setError("Error loading customers: " + customersError.message)
+        return
+      }
+
+      // Transform leads data to match expected format
+      const transformedLeads =
+        leadsData?.map((lead) => {
+          const customer = customersData?.find((c) => c.id === lead.customer_id)
+          return {
+            id: lead.id.toString(),
+            name: customer ? `${customer.first_name} ${customer.last_name}` : "Unknown Customer",
+            phone: customer?.phone || "No phone",
+            address: customer?.address || "No address",
+            source: lead.source || "Unknown",
+            services: lead.services || [],
+            description: lead.description || "No description",
+            timeAgo: getTimeAgo(lead.created_at),
+            status: lead.status || "new",
+            priority: lead.priority || "medium",
+            lastContact: lead.last_contact,
+            assignedTo: lead.assigned_to ? "Assigned" : undefined,
+          }
+        }) || []
+
+      setLeads(transformedLeads)
+      setCustomers(customersData || [])
+      console.log("✅ Real Data Loaded:", { leads: transformedLeads.length, customers: customersData?.length })
+    } catch (error) {
+      console.error("Connection error:", error)
+      setError("Connection error: " + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getTimeAgo = (dateString) => {
+    if (!dateString) return "Unknown"
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60))
+
+    if (diffInHours < 1) return "Less than 1 hour ago"
+    if (diffInHours < 24) return `${diffInHours} hours ago`
+    const diffInDays = Math.floor(diffInHours / 24)
+    return `${diffInDays} days ago`
+  }
 
   // Filter leads based on status and search
-  const getFilteredLeads = (leads: typeof mockLeads) => {
+  const getFilteredLeads = (leads) => {
     let filtered = leads
 
     // Apply URL filter first (for overdue)
@@ -126,12 +134,48 @@ export function LeadManagement() {
     return filtered
   }
 
-  const filteredLeads = getFilteredLeads(mockLeads)
+  if (loading) {
+    return (
+      <div className="p-4 lg:p-8 bg-slate-50/30 min-h-screen lg:ml-0">
+        <div className="max-w-7xl mx-auto pt-16 lg:pt-0">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+            <p className="mt-4 text-slate-600">Loading leads...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 lg:p-8 bg-slate-50/30 min-h-screen lg:ml-0">
+        <div className="max-w-7xl mx-auto pt-16 lg:pt-0">
+          <Alert className="border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              <strong>Database Error:</strong> {error}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    )
+  }
+
+  const filteredLeads = getFilteredLeads(leads)
   const isOverdueFilter = urlFilter === "overdue"
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50/30 min-h-screen lg:ml-0">
       <div className="max-w-7xl mx-auto pt-16 lg:pt-0">
+        {/* Success banner */}
+        <Alert className="mb-6 border-emerald-200 bg-emerald-50">
+          <AlertCircle className="h-4 w-4 text-emerald-600" />
+          <AlertDescription className="text-emerald-800">
+            <strong>✅ Real Data Connected:</strong> Showing {leads.length} leads from Supabase database
+          </AlertDescription>
+        </Alert>
+
         {/* Alert banner for filtered views */}
         {isOverdueFilter && (
           <Alert className="mb-6 border-orange-200 bg-orange-50">
@@ -228,27 +272,26 @@ export function LeadManagement() {
                 value="all"
                 className="px-4 py-2 text-sm font-medium rounded-md data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-none flex-1 lg:flex-none"
               >
-                All ({getFilteredLeads(mockLeads).length})
+                All ({getFilteredLeads(leads).length})
               </TabsTrigger>
               <TabsTrigger
                 value="unassigned"
                 className="px-4 py-2 text-sm font-medium rounded-md data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-none flex-1 lg:flex-none"
               >
-                Unassigned ({getFilteredLeads(mockLeads.filter((l) => l.status === "new")).length})
+                Unassigned ({getFilteredLeads(leads.filter((l) => l.status === "new")).length})
               </TabsTrigger>
               <TabsTrigger
                 value="assigned"
                 className="px-4 py-2 text-sm font-medium rounded-md data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-none flex-1 lg:flex-none"
               >
                 Assigned (
-                {getFilteredLeads(mockLeads.filter((l) => l.status === "assigned" || l.status === "contacted")).length})
+                {getFilteredLeads(leads.filter((l) => l.status === "assigned" || l.status === "contacted")).length})
               </TabsTrigger>
               <TabsTrigger
                 value="consultation"
                 className="px-4 py-2 text-sm font-medium rounded-md data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-none flex-1 lg:flex-none"
               >
-                Consultation Needed (
-                {getFilteredLeads(mockLeads.filter((l) => l.status === "consultation-needed")).length})
+                Consultation Needed ({getFilteredLeads(leads.filter((l) => l.status === "consultation-needed")).length})
               </TabsTrigger>
             </TabsList>
 
@@ -267,7 +310,7 @@ export function LeadManagement() {
 
             <TabsContent value="unassigned" className="space-y-4">
               <div className="grid gap-4">
-                {getFilteredLeads(mockLeads)
+                {getFilteredLeads(leads)
                   .filter((l) => l.status === "new")
                   .map((lead) => (
                     <LeadCard
@@ -282,7 +325,7 @@ export function LeadManagement() {
 
             <TabsContent value="assigned" className="space-y-4">
               <div className="grid gap-4">
-                {getFilteredLeads(mockLeads)
+                {getFilteredLeads(leads)
                   .filter((l) => l.status === "assigned" || l.status === "contacted")
                   .map((lead) => (
                     <LeadCard
@@ -297,7 +340,7 @@ export function LeadManagement() {
 
             <TabsContent value="consultation" className="space-y-4">
               <div className="grid gap-4">
-                {getFilteredLeads(mockLeads)
+                {getFilteredLeads(leads)
                   .filter((l) => l.status === "consultation-needed")
                   .map((lead) => (
                     <LeadCard
@@ -372,9 +415,24 @@ function LeadCard({
 
   const handleSave = async (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent card click
-    // Here you would save to database
-    console.log(`Saving lead ${id} with status ${currentStatus}`)
-    setHasChanges(false)
+    try {
+      const { error } = await supabase
+        .from("leads")
+        .update({ status: currentStatus, updated_at: new Date().toISOString() })
+        .eq("id", Number.parseInt(id))
+
+      if (error) {
+        console.error("Error updating lead:", error)
+        alert("Error saving changes")
+        return
+      }
+
+      console.log(`✅ Lead ${id} status updated to ${currentStatus}`)
+      setHasChanges(false)
+    } catch (error) {
+      console.error("Error saving lead:", error)
+      alert("Error saving changes")
+    }
   }
 
   const handleCardClick = () => {
