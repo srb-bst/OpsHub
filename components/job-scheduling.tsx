@@ -38,6 +38,7 @@ interface CrewMember {
   name: string
   initials: string
   role: string
+  team?: string
   skills: string[]
   availability: "available" | "busy" | "unavailable"
   currentJobs: number
@@ -137,6 +138,7 @@ const crewMembers: CrewMember[] = [
     name: "Mike Rodriguez",
     initials: "MR",
     role: "Lead Installer",
+    team: "Team 1",
     skills: ["Installation", "Hardscape", "Irrigation"],
     availability: "available",
     currentJobs: 1,
@@ -147,6 +149,7 @@ const crewMembers: CrewMember[] = [
     name: "Tom Wilson",
     initials: "TW",
     role: "Installation Specialist",
+    team: "Team 1",
     skills: ["Installation", "Tree Services", "Maintenance"],
     availability: "busy",
     currentJobs: 2,
@@ -157,6 +160,7 @@ const crewMembers: CrewMember[] = [
     name: "Carlos Garcia",
     initials: "CG",
     role: "Hardscape Specialist",
+    team: "Team 2",
     skills: ["Hardscape", "Installation", "Design"],
     availability: "available",
     currentJobs: 0,
@@ -167,6 +171,7 @@ const crewMembers: CrewMember[] = [
     name: "James Chen",
     initials: "JC",
     role: "Maintenance Lead",
+    team: "Team 2",
     skills: ["Maintenance", "Tree Services", "Installation"],
     availability: "available",
     currentJobs: 1,

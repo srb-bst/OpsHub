@@ -10,12 +10,11 @@ import {
   Truck,
   Users,
   UserPlus,
-  FileText,
   CalendarCheck,
   DollarSign,
   ChevronDown,
   ChevronRight,
-  Package,
+  BarChart3,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -37,9 +36,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 export function AppSidebar() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-  const [designsOpen, setDesignsOpen] = useState(true)
-  const [fieldOpsOpen, setFieldOpsOpen] = useState(true)
-  const [nurseryOpen, setNurseryOpen] = useState(false)
+  const [salesOpen, setSalesOpen] = useState(true)
+  const [operationsOpen, setOperationsOpen] = useState(true)
+  const [resourcesOpen, setResourcesOpen] = useState(false)
 
   const isActive = (path: string) => {
     return pathname === path || pathname.startsWith(`${path}/`)
@@ -53,7 +52,7 @@ export function AppSidebar() {
             <Leaf className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">GreenScape</h1>
+            <h1 className="text-lg font-semibold text-slate-900">Faulkner's Hub</h1>
             <p className="text-sm text-slate-500">Professional</p>
           </div>
         </div>
@@ -77,16 +76,16 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* Designs & Estimates - Process Flow Order */}
+              {/* Sales Pipeline */}
               <SidebarMenuItem>
-                <Collapsible open={designsOpen} onOpenChange={setDesignsOpen}>
+                <Collapsible open={salesOpen} onOpenChange={setSalesOpen}>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton className="h-12 text-base font-medium rounded-lg hover:bg-slate-50 w-full justify-between">
                       <div className="flex items-center gap-3">
-                        <ClipboardList className="h-5 w-5" />
-                        <span>Designs & Estimates</span>
+                        <UserPlus className="h-5 w-5" />
+                        <span>Sales Pipeline</span>
                       </div>
-                      {designsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {salesOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="ml-6 mt-2 space-y-1">
@@ -103,17 +102,6 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                     <SidebarMenuButton
                       asChild
-                      isActive={isActive("/consultations")}
-                      className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
-                      onClick={() => setOpen(false)}
-                    >
-                      <Link href="/consultations">
-                        <Shovel className="h-4 w-4" />
-                        <span>Consultations</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    <SidebarMenuButton
-                      asChild
                       isActive={isActive("/designs")}
                       className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
                       onClick={() => setOpen(false)}
@@ -121,17 +109,6 @@ export function AppSidebar() {
                       <Link href="/designs">
                         <ClipboardList className="h-4 w-4" />
                         <span>Design Projects</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive("/blue-sheets")}
-                      className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
-                      onClick={() => setOpen(false)}
-                    >
-                      <Link href="/blue-sheets">
-                        <FileText className="h-4 w-4" />
-                        <span>Blue Sheets</span>
                       </Link>
                     </SidebarMenuButton>
                     <SidebarMenuButton
@@ -149,16 +126,16 @@ export function AppSidebar() {
                 </Collapsible>
               </SidebarMenuItem>
 
-              {/* Field Operations - Process Flow Order */}
+              {/* Operations */}
               <SidebarMenuItem>
-                <Collapsible open={fieldOpsOpen} onOpenChange={setFieldOpsOpen}>
+                <Collapsible open={operationsOpen} onOpenChange={setOperationsOpen}>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton className="h-12 text-base font-medium rounded-lg hover:bg-slate-50 w-full justify-between">
                       <div className="flex items-center gap-3">
                         <Shovel className="h-5 w-5" />
-                        <span>Field Operations</span>
+                        <span>Operations</span>
                       </div>
-                      {fieldOpsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {operationsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="ml-6 mt-2 space-y-1">
@@ -171,17 +148,6 @@ export function AppSidebar() {
                       <Link href="/scheduling">
                         <CalendarCheck className="h-4 w-4" />
                         <span>Job Scheduling</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive("/deliveries")}
-                      className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
-                      onClick={() => setOpen(false)}
-                    >
-                      <Link href="/deliveries">
-                        <Package className="h-4 w-4" />
-                        <span>Deliveries</span>
                       </Link>
                     </SidebarMenuButton>
                     <SidebarMenuButton
@@ -206,47 +172,73 @@ export function AppSidebar() {
                         <span>Active Jobs</span>
                       </Link>
                     </SidebarMenuButton>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive("/operations/crew")}
+                      className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
+                      onClick={() => setOpen(false)}
+                    >
+                      <Link href="/operations/crew">
+                        <Users className="h-4 w-4" />
+                        <span>Crew Management</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </CollapsibleContent>
+                </Collapsible>
+              </SidebarMenuItem>
+
+              {/* Resources */}
+              <SidebarMenuItem>
+                <Collapsible open={resourcesOpen} onOpenChange={setResourcesOpen}>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton className="h-12 text-base font-medium rounded-lg hover:bg-slate-50 w-full justify-between">
+                      <div className="flex items-center gap-3">
+                        <BarChart3 className="h-5 w-5" />
+                        <span>Resources</span>
+                      </div>
+                      {resourcesOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="ml-6 mt-2 space-y-1">
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive("/resources/assignments")}
+                      className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
+                      onClick={() => setOpen(false)}
+                    >
+                      <Link href="/resources/assignments">
+                        <Users className="h-4 w-4" />
+                        <span>Design Assignments</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive("/resources/overview")}
+                      className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
+                      onClick={() => setOpen(false)}
+                    >
+                      <Link href="/resources/overview">
+                        <BarChart3 className="h-4 w-4" />
+                        <span>Lead Overview</span>
+                      </Link>
+                    </SidebarMenuButton>
                   </CollapsibleContent>
                 </Collapsible>
               </SidebarMenuItem>
 
               {/* Nursery Management */}
               <SidebarMenuItem>
-                <Collapsible open={nurseryOpen} onOpenChange={setNurseryOpen}>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton className="h-12 text-base font-medium rounded-lg hover:bg-slate-50 w-full justify-between">
-                      <div className="flex items-center gap-3">
-                        <Leaf className="h-5 w-5" />
-                        <span>Nursery Management</span>
-                      </div>
-                      {nurseryOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="ml-6 mt-2 space-y-1">
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive("/nursery")}
-                      className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
-                      onClick={() => setOpen(false)}
-                    >
-                      <Link href="/nursery">
-                        <Leaf className="h-4 w-4" />
-                        <span>Dashboard</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive("/nursery/issues")}
-                      className="h-10 text-sm font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700"
-                      onClick={() => setOpen(false)}
-                    >
-                      <Link href="/nursery/issues">
-                        <FileText className="h-4 w-4" />
-                        <span>Issue Tracker</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </CollapsibleContent>
-                </Collapsible>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/nursery")}
+                  className="h-12 text-base font-medium rounded-lg hover:bg-slate-50 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700 data-[active=true]:border-emerald-200 data-[active=true]:border"
+                  onClick={() => setOpen(false)}
+                >
+                  <Link href="/nursery">
+                    <Leaf className="h-5 w-5" />
+                    <span>Nursery</span>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
 
               {/* Calendar */}
@@ -289,8 +281,8 @@ export function AppSidebar() {
           className="w-full h-12 text-base font-medium bg-emerald-500 hover:bg-emerald-600 rounded-lg shadow-none"
           onClick={() => setOpen(false)}
         >
-          <Link href="/estimates/new">
-            <span>New Estimate</span>
+          <Link href="/designs/new">
+            <span>New Design Project</span>
           </Link>
         </Button>
       </div>

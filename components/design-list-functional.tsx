@@ -11,79 +11,42 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { supabase } from "@/lib/supabase"
+import { supabase, type DesignProject } from "@/lib/supabase"
 
-interface DesignProject {
-  id: string
-  customer_id: string
-  title: string
-  status: string
-  project_type: string
-  area: string
-  created_at: string
-}
-
-interface Customer {
-  id: string
-  first_name: string
-  last_name: string
-  email?: string
-  phone?: string
-  address?: string
-}
-
-export function DesignList() {
+export function DesignListFunctional() {
   const [designs, setDesigns] = useState<DesignProject[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
 
   useEffect(() => {
-    fetchData()
+    fetchDesigns()
   }, [])
 
-  const fetchData = async () => {
+  const fetchDesigns = async () => {
     try {
-      console.log("🔄 Fetching designs and customers...")
+      const { data, error } = await supabase
+        .from("design_projects")
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .order("created_at", { ascending: false })
 
-      const [designsResponse, customersResponse] = await Promise.all([
-        supabase.from("design_projects").select("*").order("created_at", { ascending: false }),
-        supabase.from("customers").select("*"),
-      ])
-
-      if (designsResponse.error) {
-        console.error("❌ Design fetch error:", designsResponse.error)
-        throw designsResponse.error
-      }
-      if (customersResponse.error) {
-        console.error("❌ Customer fetch error:", customersResponse.error)
-        throw customersResponse.error
-      }
-
-      console.log("✅ Designs fetched:", designsResponse.data?.length || 0)
-      console.log("✅ Customers fetched:", customersResponse.data?.length || 0)
-
-      setDesigns(designsResponse.data || [])
-      setCustomers(customersResponse.data || [])
+      if (error) throw error
+      setDesigns(data || [])
     } catch (error) {
-      console.error("❌ Error fetching data:", error)
+      console.error("Error fetching designs:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  const getCustomerById = (customerId: string) => {
-    return customers.find((c) => c.id === customerId)
-  }
-
   const filteredDesigns = designs.filter((design) => {
-    const customer = getCustomerById(design.customer_id)
-    const customerName = customer ? `${customer.first_name} ${customer.last_name}` : ""
-
     const matchesSearch =
       design.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customerName.toLowerCase().includes(searchTerm.toLowerCase())
+      design.customer?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      design.customer?.last_name?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesType = typeFilter === "all" || design.project_type === typeFilter
 
@@ -108,11 +71,6 @@ export function DesignList() {
 
   return (
     <div className="space-y-4">
-      {/* Debug Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-        <strong>🔍 Debug:</strong> Found {designs.length} designs, {customers.length} customers
-      </div>
-
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -161,12 +119,7 @@ export function DesignList() {
           <ScrollArea className="h-[600px]">
             <div className="space-y-4">
               {getDesignsByStatus("all").map((design) => (
-                <DesignCard
-                  key={design.id}
-                  design={design}
-                  customer={getCustomerById(design.customer_id)}
-                  onUpdate={fetchData}
-                />
+                <DesignCard key={design.id} design={design} onUpdate={fetchDesigns} />
               ))}
               {getDesignsByStatus("all").length === 0 && (
                 <div className="text-center py-12">
@@ -184,12 +137,7 @@ export function DesignList() {
           <ScrollArea className="h-[600px]">
             <div className="space-y-4">
               {getDesignsByStatus("needs-estimate").map((design) => (
-                <DesignCard
-                  key={design.id}
-                  design={design}
-                  customer={getCustomerById(design.customer_id)}
-                  onUpdate={fetchData}
-                />
+                <DesignCard key={design.id} design={design} onUpdate={fetchDesigns} />
               ))}
             </div>
           </ScrollArea>
@@ -199,12 +147,7 @@ export function DesignList() {
           <ScrollArea className="h-[600px]">
             <div className="space-y-4">
               {getDesignsByStatus("pending-approval").map((design) => (
-                <DesignCard
-                  key={design.id}
-                  design={design}
-                  customer={getCustomerById(design.customer_id)}
-                  onUpdate={fetchData}
-                />
+                <DesignCard key={design.id} design={design} onUpdate={fetchDesigns} />
               ))}
             </div>
           </ScrollArea>
@@ -214,12 +157,7 @@ export function DesignList() {
           <ScrollArea className="h-[600px]">
             <div className="space-y-4">
               {getDesignsByStatus("approved").map((design) => (
-                <DesignCard
-                  key={design.id}
-                  design={design}
-                  customer={getCustomerById(design.customer_id)}
-                  onUpdate={fetchData}
-                />
+                <DesignCard key={design.id} design={design} onUpdate={fetchDesigns} />
               ))}
             </div>
           </ScrollArea>
@@ -231,12 +169,62 @@ export function DesignList() {
 
 interface DesignCardProps {
   design: DesignProject
-  customer?: Customer
   onUpdate: () => void
 }
 
-function DesignCard({ design, customer, onUpdate }: DesignCardProps) {
-  const customerName = customer ? `${customer.first_name} ${customer.last_name}` : "Unknown Customer"
+function DesignCard({ design, onUpdate }: DesignCardProps) {
+  const [updating, setUpdating] = useState(false)
+
+  const updateStatus = async (newStatus: string) => {
+    setUpdating(true)
+    try {
+      const { error } = await supabase
+        .from("design_projects")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", design.id)
+
+      if (error) throw error
+      onUpdate()
+    } catch (error) {
+      console.error("Error updating design:", error)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const createEstimate = async () => {
+    setUpdating(true)
+    try {
+      // Generate estimate number
+      const estimateNumber = `EST-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+
+      const { error } = await supabase.from("estimates").insert({
+        design_project_id: design.id,
+        estimate_number: estimateNumber,
+        status: "draft",
+        total_amount: 0,
+        subtotal: 0,
+        markup_percentage: 25,
+        markup_amount: 0,
+        tax_percentage: 8.5,
+        tax_amount: 0,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+      })
+
+      if (error) throw error
+
+      // Update design status
+      await updateStatus("pending-approval")
+    } catch (error) {
+      console.error("Error creating estimate:", error)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const customerName = design.customer
+    ? `${design.customer.first_name} ${design.customer.last_name}`
+    : "Unknown Customer"
 
   return (
     <Card>
@@ -268,7 +256,7 @@ function DesignCard({ design, customer, onUpdate }: DesignCardProps) {
           <div className="text-sm">
             <span className="font-medium">Customer:</span> {customerName}
           </div>
-          <div className="text-sm text-muted-foreground">{customer?.address}</div>
+          <div className="text-sm text-muted-foreground">{design.customer?.address}</div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
               <span className="font-medium">Type:</span> {design.project_type}
@@ -282,22 +270,18 @@ function DesignCard({ design, customer, onUpdate }: DesignCardProps) {
           </div>
           <div className="flex justify-end gap-2 mt-2">
             {design.status === "needs-estimate" && (
-              <Button size="sm" asChild>
-                <Link href={`/estimates/new?design=${design.id}`}>Create Estimate</Link>
+              <Button size="sm" onClick={createEstimate} disabled={updating}>
+                {updating ? "Creating..." : "Create Estimate"}
               </Button>
             )}
             {design.status === "pending-approval" && (
-              <Button size="sm" variant="outline" asChild>
-                <Link href="/estimates">Check Estimates</Link>
+              <Button size="sm" variant="outline">
+                Check Status
               </Button>
             )}
-            {design.status === "approved" && (
-              <Button size="sm" asChild>
-                <Link href="/scheduling">Schedule Job</Link>
-              </Button>
-            )}
-            <Button size="sm" variant="outline" asChild>
-              <Link href={`/designs/${design.id}`}>View Details</Link>
+            {design.status === "approved" && <Button size="sm">Schedule Job</Button>}
+            <Button size="sm" variant="outline">
+              View Details
             </Button>
           </div>
         </div>

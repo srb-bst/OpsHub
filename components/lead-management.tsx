@@ -1,7 +1,9 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
-import { Filter, Plus, Search, User, Phone, MapPin, Clock, ChevronRight, AlertCircle } from "lucide-react"
+import { Filter, Plus, Search, User, Phone, MapPin, Clock, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 
@@ -17,6 +19,8 @@ export function LeadManagement() {
   const searchParams = useSearchParams()
   const urlFilter = searchParams.get("filter")
   const [selectedLead, setSelectedLead] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [searchTerm, setSearchTerm] = useState("")
 
   // Mock leads with realistic overdue data
   const mockLeads = [
@@ -74,12 +78,27 @@ export function LeadManagement() {
       priority: "medium",
       lastContact: "2024-01-18T16:00:00Z", // Recent
     },
+    {
+      id: "5",
+      name: "Linda Davis",
+      phone: "(555) 567-9012",
+      address: "987 Elm Court, Springfield",
+      source: "Online Ad",
+      services: ["Hardscape", "Installation"],
+      description: "Needs a retaining wall and paver patio installed",
+      timeAgo: "1 week ago",
+      status: "consultation-needed",
+      priority: "high",
+    },
   ]
 
-  // Filter leads based on URL parameter
-  const getFilteredLeads = () => {
+  // Filter leads based on status and search
+  const getFilteredLeads = (leads: typeof mockLeads) => {
+    let filtered = leads
+
+    // Apply URL filter first (for overdue)
     if (urlFilter === "overdue") {
-      return mockLeads.filter((lead) => {
+      filtered = leads.filter((lead) => {
         if (!lead.lastContact) return false
         const lastContact = new Date(lead.lastContact)
         const now = new Date()
@@ -87,10 +106,27 @@ export function LeadManagement() {
         return hoursDiff > 48 // More than 48 hours
       })
     }
-    return mockLeads
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((lead) => lead.status === statusFilter)
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (lead) =>
+          lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.phone.includes(searchTerm) ||
+          lead.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.description.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    }
+
+    return filtered
   }
 
-  const filteredLeads = getFilteredLeads()
+  const filteredLeads = getFilteredLeads(mockLeads)
   const isOverdueFilter = urlFilter === "overdue"
 
   return (
@@ -134,11 +170,13 @@ export function LeadManagement() {
             <Input
               type="search"
               placeholder="Search leads..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 h-12 text-base rounded-lg border-slate-200 bg-white/80 backdrop-blur-sm"
             />
           </div>
           <div className="flex gap-2">
-            <Select defaultValue="all">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full lg:w-[140px] h-12 text-base rounded-lg border-slate-200 bg-white/80 backdrop-blur-sm">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -147,7 +185,7 @@ export function LeadManagement() {
                 <SelectItem value="new">New</SelectItem>
                 <SelectItem value="assigned">Assigned</SelectItem>
                 <SelectItem value="contacted">Contacted</SelectItem>
-                <SelectItem value="qualified">Qualified</SelectItem>
+                <SelectItem value="consultation-needed">Consultation Needed</SelectItem>
               </SelectContent>
             </Select>
             <Button
@@ -184,31 +222,52 @@ export function LeadManagement() {
             </div>
           </div>
         ) : (
-          <Tabs defaultValue="unassigned" className="w-full">
+          <Tabs defaultValue="all" className="w-full">
             <TabsList className="h-12 bg-white/80 backdrop-blur-sm rounded-lg border-slate-200/60 shadow-none p-1 w-full lg:w-auto mb-6">
+              <TabsTrigger
+                value="all"
+                className="px-4 py-2 text-sm font-medium rounded-md data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-none flex-1 lg:flex-none"
+              >
+                All ({getFilteredLeads(mockLeads).length})
+              </TabsTrigger>
               <TabsTrigger
                 value="unassigned"
                 className="px-4 py-2 text-sm font-medium rounded-md data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-none flex-1 lg:flex-none"
               >
-                Unassigned ({mockLeads.filter((l) => l.status === "new").length})
+                Unassigned ({getFilteredLeads(mockLeads.filter((l) => l.status === "new")).length})
               </TabsTrigger>
               <TabsTrigger
                 value="assigned"
                 className="px-4 py-2 text-sm font-medium rounded-md data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-none flex-1 lg:flex-none"
               >
-                Assigned ({mockLeads.filter((l) => l.status === "assigned" || l.status === "contacted").length})
+                Assigned (
+                {getFilteredLeads(mockLeads.filter((l) => l.status === "assigned" || l.status === "contacted")).length})
               </TabsTrigger>
               <TabsTrigger
-                value="qualified"
+                value="consultation"
                 className="px-4 py-2 text-sm font-medium rounded-md data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-none flex-1 lg:flex-none"
               >
-                Qualified ({mockLeads.filter((l) => l.status === "qualified").length})
+                Consultation Needed (
+                {getFilteredLeads(mockLeads.filter((l) => l.status === "consultation-needed")).length})
               </TabsTrigger>
             </TabsList>
 
+            <TabsContent value="all" className="space-y-4">
+              <div className="grid gap-4">
+                {filteredLeads.map((lead) => (
+                  <LeadCard
+                    key={lead.id}
+                    {...lead}
+                    isSelected={selectedLead === lead.id}
+                    onSelect={() => setSelectedLead(selectedLead === lead.id ? null : lead.id)}
+                  />
+                ))}
+              </div>
+            </TabsContent>
+
             <TabsContent value="unassigned" className="space-y-4">
               <div className="grid gap-4">
-                {mockLeads
+                {getFilteredLeads(mockLeads)
                   .filter((l) => l.status === "new")
                   .map((lead) => (
                     <LeadCard
@@ -223,7 +282,7 @@ export function LeadManagement() {
 
             <TabsContent value="assigned" className="space-y-4">
               <div className="grid gap-4">
-                {mockLeads
+                {getFilteredLeads(mockLeads)
                   .filter((l) => l.status === "assigned" || l.status === "contacted")
                   .map((lead) => (
                     <LeadCard
@@ -236,10 +295,10 @@ export function LeadManagement() {
               </div>
             </TabsContent>
 
-            <TabsContent value="qualified" className="space-y-4">
+            <TabsContent value="consultation" className="space-y-4">
               <div className="grid gap-4">
-                {mockLeads
-                  .filter((l) => l.status === "qualified")
+                {getFilteredLeads(mockLeads)
+                  .filter((l) => l.status === "consultation-needed")
                   .map((lead) => (
                     <LeadCard
                       key={lead.id}
@@ -277,7 +336,7 @@ interface LeadCardProps {
   services: string[]
   description: string
   timeAgo: string
-  status: "new" | "assigned" | "contacted" | "qualified"
+  status: "new" | "assigned" | "contacted" | "consultation-needed"
   assignedTo?: string
   priority: "low" | "medium" | "high"
   estimatedValue?: string
@@ -303,12 +362,31 @@ function LeadCard({
   onSelect,
   showOverdueWarning = false,
 }: LeadCardProps) {
+  const [currentStatus, setCurrentStatus] = useState(status)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  const handleStatusChange = (newStatus: string) => {
+    setCurrentStatus(newStatus as any)
+    setHasChanges(true)
+  }
+
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click
+    // Here you would save to database
+    console.log(`Saving lead ${id} with status ${currentStatus}`)
+    setHasChanges(false)
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/leads/${id}`
+  }
+
   return (
     <Card
-      className={`bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none cursor-pointer transition-all ${
-        isSelected ? "ring-2 ring-emerald-500 border-emerald-200" : "hover:bg-white"
-      } ${showOverdueWarning ? "border-l-4 border-l-orange-500" : ""}`}
-      onClick={onSelect}
+      className={`bg-white/80 backdrop-blur-sm rounded-xl border-slate-200/60 shadow-none cursor-pointer transition-all hover:bg-white ${
+        showOverdueWarning ? "border-l-4 border-l-orange-500" : ""
+      }`}
+      onClick={handleCardClick}
     >
       <CardContent className="p-4 lg:p-6">
         {showOverdueWarning && (
@@ -335,7 +413,17 @@ function LeadCard({
             {priority === "high" && <div className="h-2 w-2 bg-red-500 rounded-full"></div>}
             {priority === "medium" && <div className="h-2 w-2 bg-yellow-500 rounded-full"></div>}
             {priority === "low" && <div className="h-2 w-2 bg-green-500 rounded-full"></div>}
-            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <Select value={currentStatus} onValueChange={handleStatusChange}>
+              <SelectTrigger className="w-32 h-8 text-xs" onClick={(e) => e.stopPropagation()}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="assigned">Assigned</SelectItem>
+                <SelectItem value="contacted">Contacted</SelectItem>
+                <SelectItem value="consultation-needed">Consultation Needed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -369,25 +457,39 @@ function LeadCard({
           </div>
 
           <div className="flex items-center gap-2">
-            {status === "new" && (
-              <>
-                <Button asChild size="sm" variant="outline" className="h-8 px-3 text-xs rounded-lg border-slate-200">
-                  <Link href="/leads/assign">Assign</Link>
-                </Button>
-                <Badge className="bg-green-50 text-green-700 hover:bg-green-50 text-xs px-2 py-1 rounded-md font-medium border-0">
-                  New
-                </Badge>
-              </>
+            {hasChanges && (
+              <Button
+                size="sm"
+                className="h-8 px-3 text-xs bg-emerald-500 hover:bg-emerald-600 rounded-lg"
+                onClick={handleSave}
+              >
+                Save
+              </Button>
             )}
-            {status === "assigned" && assignedTo && (
+            {currentStatus === "new" && (
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-8 px-3 text-xs rounded-lg border-slate-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Link href="/leads/assign">Assign</Link>
+              </Button>
+            )}
+            {currentStatus === "assigned" && assignedTo && (
               <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs px-2 py-1 rounded-md font-medium border-0">
                 Assigned to {assignedTo}
               </Badge>
             )}
-            {status === "contacted" && (
+            {currentStatus === "contacted" && (
               <>
                 {showOverdueWarning && (
-                  <Button size="sm" className="h-8 px-3 text-xs bg-orange-500 hover:bg-orange-600 rounded-lg">
+                  <Button
+                    size="sm"
+                    className="h-8 px-3 text-xs bg-orange-500 hover:bg-orange-600 rounded-lg"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     Follow Up Now
                   </Button>
                 )}
@@ -396,11 +498,11 @@ function LeadCard({
                 </Badge>
               </>
             )}
-            {status === "qualified" && (
+            {currentStatus === "consultation-needed" && (
               <div className="flex items-center gap-2">
                 {estimatedValue && <span className="text-sm font-semibold text-emerald-600">{estimatedValue}</span>}
                 <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 text-xs px-2 py-1 rounded-md font-medium border-0">
-                  Qualified
+                  Consultation Needed
                 </Badge>
               </div>
             )}

@@ -38,7 +38,7 @@ export function DashboardView() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 lg:mb-8 gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-semibold text-slate-900 mb-1">Command Center</h1>
+            <h1 className="text-2xl lg:text-3xl font-semibold text-slate-900 mb-1">Dashboard</h1>
             <p className="text-slate-600">{todayDate} • Your business overview at a glance</p>
           </div>
           <div className="flex items-center gap-3">

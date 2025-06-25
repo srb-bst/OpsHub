@@ -1,7 +1,5 @@
-"use client"
-
-import { NewEstimate } from "@/components/new-estimate"
+import { SimpleEstimateForm } from "@/components/simple-estimate-form"
 
 export default function NewEstimatePage() {
-  return <NewEstimate />
+  return <SimpleEstimateForm />
 }

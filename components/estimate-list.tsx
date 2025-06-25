@@ -1,22 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import {
-  DollarSign,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Plus,
-  Filter,
-  Search,
-  Calendar,
-  User,
-  FileText,
-  TrendingUp,
-  Eye,
-  Send,
-  Edit,
-} from "lucide-react"
+import { useEffect, useState } from "react"
+import { DollarSign, Clock, CheckCircle2, Plus, Search, Calendar, FileText, TrendingUp, Eye } from "lucide-react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
@@ -24,198 +9,72 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { supabase } from "@/lib/supabase"
 
 interface Estimate {
   id: string
-  estimateNumber: string
-  customerName: string
-  projectTitle: string
-  blueSheetId: string
-  status: "draft" | "internal-review" | "sent-to-customer" | "under-negotiation" | "approved" | "rejected" | "expired"
-  totalAmount: string
-  createdDate: string
-  sentDate?: string
-  responseDate?: string
-  expiryDate: string
-  estimator: string
-  estimatorInitials: string
-  priority: "low" | "medium" | "high"
-  customerEmail: string
-  customerPhone: string
-  projectType: string
-  services: string[]
-  revisionCount: number
-  lastActivity: string
-  daysInStage: number
+  design_project_id: string
+  estimate_number: string
+  customer_name: string
+  project_title: string
+  status: string
+  total_amount: number
+  created_at: string
 }
 
-const mockEstimates: Estimate[] = [
-  {
-    id: "1",
-    estimateNumber: "EST-2025-001",
-    customerName: "Sarah Johnson",
-    projectTitle: "Front Yard Redesign",
-    blueSheetId: "bs-001",
-    status: "sent-to-customer",
-    totalAmount: "$15,500",
-    createdDate: "2025-06-15",
-    sentDate: "2025-06-16",
-    expiryDate: "2025-07-16",
-    estimator: "Emma Thompson",
-    estimatorInitials: "ET",
-    priority: "high",
-    customerEmail: "sarah.johnson@email.com",
-    customerPhone: "(555) 123-4567",
-    projectType: "Residential",
-    services: ["Design", "Installation"],
-    revisionCount: 0,
-    lastActivity: "Sent to customer",
-    daysInStage: 2,
-  },
-  {
-    id: "2",
-    estimateNumber: "EST-2025-002",
-    customerName: "Jennifer Martinez",
-    projectTitle: "Backyard Renovation",
-    blueSheetId: "bs-002",
-    status: "under-negotiation",
-    totalAmount: "$35,000",
-    createdDate: "2025-06-12",
-    sentDate: "2025-06-13",
-    responseDate: "2025-06-15",
-    expiryDate: "2025-07-13",
-    estimator: "Emma Thompson",
-    estimatorInitials: "ET",
-    priority: "high",
-    customerEmail: "jennifer.martinez@email.com",
-    customerPhone: "(555) 345-6789",
-    projectType: "Residential",
-    services: ["Design", "Hardscape", "Installation"],
-    revisionCount: 1,
-    lastActivity: "Customer requested changes",
-    daysInStage: 3,
-  },
-  {
-    id: "3",
-    estimateNumber: "EST-2025-003",
-    customerName: "Mountain View HOA",
-    projectTitle: "Community Landscaping",
-    blueSheetId: "bs-003",
-    status: "approved",
-    totalAmount: "$28,000",
-    createdDate: "2025-06-10",
-    sentDate: "2025-06-11",
-    responseDate: "2025-06-14",
-    expiryDate: "2025-07-11",
-    estimator: "David Chen",
-    estimatorInitials: "DC",
-    priority: "medium",
-    customerEmail: "board@mountainviewhoa.com",
-    customerPhone: "(555) 987-6543",
-    projectType: "Commercial",
-    services: ["Installation", "Maintenance"],
-    revisionCount: 0,
-    lastActivity: "Approved by customer",
-    daysInStage: 4,
-  },
-  {
-    id: "4",
-    estimateNumber: "EST-2025-004",
-    customerName: "Robert Thompson",
-    projectTitle: "Garden Design Consultation",
-    blueSheetId: "bs-004",
-    status: "draft",
-    totalAmount: "$8,500",
-    createdDate: "2025-06-17",
-    expiryDate: "2025-07-17",
-    estimator: "Emma Thompson",
-    estimatorInitials: "ET",
-    priority: "medium",
-    customerEmail: "robert.thompson@email.com",
-    customerPhone: "(555) 234-5678",
-    projectType: "Residential",
-    services: ["Design", "Consultation"],
-    revisionCount: 0,
-    lastActivity: "Draft created",
-    daysInStage: 1,
-  },
-  {
-    id: "5",
-    estimateNumber: "EST-2025-005",
-    customerName: "City of Springfield",
-    projectTitle: "Downtown Beautification",
-    blueSheetId: "bs-005",
-    status: "internal-review",
-    totalAmount: "$125,000",
-    createdDate: "2025-06-14",
-    expiryDate: "2025-08-14",
-    estimator: "David Chen",
-    estimatorInitials: "DC",
-    priority: "high",
-    customerEmail: "projects@springfield.gov",
-    customerPhone: "(555) 456-7890",
-    projectType: "Municipal",
-    services: ["Design", "Installation", "Maintenance"],
-    revisionCount: 0,
-    lastActivity: "Pending internal review",
-    daysInStage: 4,
-  },
-  {
-    id: "6",
-    estimateNumber: "EST-2025-006",
-    customerName: "Anderson Residence",
-    projectTitle: "Patio Installation",
-    blueSheetId: "bs-006",
-    status: "rejected",
-    totalAmount: "$12,000",
-    createdDate: "2025-06-08",
-    sentDate: "2025-06-09",
-    responseDate: "2025-06-12",
-    expiryDate: "2025-07-09",
-    estimator: "Emma Thompson",
-    estimatorInitials: "ET",
-    priority: "low",
-    customerEmail: "mary.anderson@email.com",
-    customerPhone: "(555) 345-6789",
-    projectType: "Residential",
-    services: ["Hardscape", "Installation"],
-    revisionCount: 1,
-    lastActivity: "Rejected by customer",
-    daysInStage: 6,
-  },
-]
-
 export function EstimateList() {
+  const [estimates, setEstimates] = useState<Estimate[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [priorityFilter, setPriorityFilter] = useState("all")
   const [activeTab, setActiveTab] = useState("all")
+
+  useEffect(() => {
+    fetchEstimates()
+  }, [])
+
+  const fetchEstimates = async () => {
+    try {
+      console.log("🔄 Fetching estimates...")
+
+      const { data, error } = await supabase.from("estimates").select("*").order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("❌ Estimate fetch error:", error)
+        throw error
+      }
+
+      console.log("✅ Estimates fetched:", data?.length || 0)
+      setEstimates(data || [])
+    } catch (error) {
+      console.error("❌ Error fetching estimates:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusCounts = () => {
     return {
-      all: mockEstimates.length,
-      draft: mockEstimates.filter((e) => e.status === "draft").length,
-      review: mockEstimates.filter((e) => e.status === "internal-review").length,
-      sent: mockEstimates.filter((e) => e.status === "sent-to-customer").length,
-      negotiation: mockEstimates.filter((e) => e.status === "under-negotiation").length,
-      approved: mockEstimates.filter((e) => e.status === "approved").length,
-      rejected: mockEstimates.filter((e) => e.status === "rejected").length,
+      all: estimates.length,
+      draft: estimates.filter((e) => e.status === "draft").length,
+      review: estimates.filter((e) => e.status === "internal-review").length,
+      sent: estimates.filter((e) => e.status === "sent-to-customer").length,
+      negotiation: estimates.filter((e) => e.status === "under-negotiation").length,
+      approved: estimates.filter((e) => e.status === "approved").length,
+      rejected: estimates.filter((e) => e.status === "rejected").length,
     }
   }
 
   const statusCounts = getStatusCounts()
 
-  const filteredEstimates = mockEstimates.filter((estimate) => {
+  const filteredEstimates = estimates.filter((estimate) => {
     const matchesSearch =
-      estimate.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      estimate.estimateNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      estimate.projectTitle.toLowerCase().includes(searchTerm.toLowerCase())
+      estimate.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      estimate.estimate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      estimate.project_title.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesStatus = activeTab === "all" || estimate.status === getStatusFromTab(activeTab)
-    const matchesPriority = priorityFilter === "all" || estimate.priority === priorityFilter
 
-    return matchesSearch && matchesStatus && matchesPriority
+    return matchesSearch && matchesStatus
   })
 
   function getStatusFromTab(tab: string) {
@@ -231,19 +90,17 @@ export function EstimateList() {
   }
 
   const getPipelineMetrics = () => {
-    const totalValue = mockEstimates
+    const totalValue = estimates
       .filter((e) => !["rejected", "expired"].includes(e.status))
-      .reduce((sum, e) => sum + Number.parseFloat(e.totalAmount.replace(/[$,]/g, "")), 0)
+      .reduce((sum, e) => sum + (e.total_amount || 0), 0)
 
-    const approvedValue = mockEstimates
+    const approvedValue = estimates
       .filter((e) => e.status === "approved")
-      .reduce((sum, e) => sum + Number.parseFloat(e.totalAmount.replace(/[$,]/g, "")), 0)
+      .reduce((sum, e) => sum + (e.total_amount || 0), 0)
 
-    const pendingCount = mockEstimates.filter((e) =>
-      ["sent-to-customer", "under-negotiation"].includes(e.status),
-    ).length
+    const pendingCount = estimates.filter((e) => ["sent-to-customer", "under-negotiation"].includes(e.status)).length
 
-    const conversionRate = mockEstimates.length > 0 ? (statusCounts.approved / mockEstimates.length) * 100 : 0
+    const conversionRate = estimates.length > 0 ? (statusCounts.approved / estimates.length) * 100 : 0
 
     return {
       totalValue: `$${totalValue.toLocaleString()}`,
@@ -255,9 +112,25 @@ export function EstimateList() {
 
   const metrics = getPipelineMetrics()
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading estimates...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 lg:p-8 bg-slate-50/30 min-h-screen lg:ml-0">
       <div className="max-w-7xl mx-auto pt-16 lg:pt-0">
+        {/* Debug Info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm mb-4">
+          <strong>🔍 Debug:</strong> Found {estimates.length} estimates
+        </div>
+
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4">
           <div>
@@ -320,26 +193,6 @@ export function EstimateList() {
                 className="pl-10 h-12 text-base rounded-lg border-slate-200 bg-white/80 backdrop-blur-sm"
               />
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full lg:w-[140px] h-12 text-base rounded-lg border-slate-200 bg-white/80 backdrop-blur-sm">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="high">High Priority</SelectItem>
-                <SelectItem value="medium">Medium Priority</SelectItem>
-                <SelectItem value="low">Low Priority</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-12 px-4 rounded-lg border-slate-200 bg-white/80 backdrop-blur-sm"
-            >
-              <Filter className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
@@ -467,8 +320,6 @@ function EstimateCard({ estimate }: EstimateCardProps) {
         return "bg-green-100 text-green-700"
       case "rejected":
         return "bg-red-100 text-red-700"
-      case "expired":
-        return "bg-gray-100 text-gray-700"
       default:
         return "bg-slate-100 text-slate-700"
     }
@@ -488,95 +339,43 @@ function EstimateCard({ estimate }: EstimateCardProps) {
         return "Approved"
       case "rejected":
         return "Rejected"
-      case "expired":
-        return "Expired"
       default:
         return status
     }
   }
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "bg-red-500"
-      case "medium":
-        return "bg-yellow-500"
-      case "low":
-        return "bg-green-500"
-      default:
-        return "bg-slate-500"
-    }
-  }
-
-  const isUrgent = estimate.daysInStage > 7 && ["sent-to-customer", "under-negotiation"].includes(estimate.status)
-
   return (
-    <div
-      className={`p-4 border rounded-lg hover:border-slate-300 transition-colors ${
-        isUrgent ? "border-orange-200 bg-orange-50/30" : "border-slate-200"
-      }`}
-    >
+    <div className="p-4 border rounded-lg hover:border-slate-300 transition-colors border-slate-200">
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h3 className="font-semibold text-slate-900">{estimate.customerName}</h3>
-            <div className={`h-2 w-2 rounded-full ${getPriorityColor(estimate.priority)}`} />
-            {isUrgent && <AlertCircle className="h-4 w-4 text-orange-500" />}
+            <h3 className="font-semibold text-slate-900">{estimate.customer_name}</h3>
           </div>
-          <p className="text-sm text-slate-600 mb-1">{estimate.projectTitle}</p>
-          <p className="text-xs text-slate-500">{estimate.estimateNumber}</p>
+          <p className="text-sm text-slate-600 mb-1">{estimate.project_title}</p>
+          <p className="text-xs text-slate-500">{estimate.estimate_number}</p>
         </div>
         <div className="text-right">
-          <div className="text-xl font-bold text-emerald-600 mb-1">{estimate.totalAmount}</div>
+          <div className="text-xl font-bold text-emerald-600 mb-1">
+            ${(estimate.total_amount || 0).toLocaleString()}
+          </div>
           <Badge className={`${getStatusColor(estimate.status)} text-xs px-2 py-1 rounded-md font-medium border-0`}>
             {getStatusLabel(estimate.status)}
           </Badge>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-3">
-        {estimate.services.map((service) => (
-          <Badge
-            key={service}
-            className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs px-2 py-1 rounded-md font-medium border-0"
-          >
-            {service}
-          </Badge>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
-        <div className="flex items-center gap-2">
-          <User className="h-3 w-3 text-slate-400" />
-          <span className="text-slate-600">{estimate.estimator}</span>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-4">
         <div className="flex items-center gap-2">
           <Calendar className="h-3 w-3 text-slate-400" />
-          <span className="text-slate-600">{new Date(estimate.createdDate).toLocaleDateString()}</span>
+          <span className="text-slate-600">{new Date(estimate.created_at).toLocaleDateString()}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Clock className="h-3 w-3 text-slate-400" />
-          <span className="text-slate-600">{estimate.daysInStage} days in stage</span>
-        </div>
-        {estimate.revisionCount > 0 && (
-          <div className="flex items-center gap-2">
-            <Edit className="h-3 w-3 text-slate-400" />
-            <span className="text-slate-600">{estimate.revisionCount} revision(s)</span>
-          </div>
-        )}
       </div>
 
       <div className="flex items-center justify-between">
         <div className="text-xs text-slate-500">
-          <span className="font-medium">Last activity:</span> {estimate.lastActivity}
+          <span className="font-medium">Status:</span> {getStatusLabel(estimate.status)}
         </div>
         <div className="flex gap-2">
-          <Button asChild size="sm" variant="outline" className="h-8 px-3 text-xs rounded-lg border-slate-200">
-            <Link href={`/blue-sheets/${estimate.blueSheetId}`}>
-              <FileText className="mr-1 h-3 w-3" />
-              Blue Sheet
-            </Link>
-          </Button>
           <Button asChild size="sm" variant="outline" className="h-8 px-3 text-xs rounded-lg border-slate-200">
             <Link href={`/estimates/${estimate.id}`}>
               <Eye className="mr-1 h-3 w-3" />
@@ -589,20 +388,6 @@ function EstimateCard({ estimate }: EstimateCardProps) {
                 <Calendar className="mr-1 h-3 w-3" />
                 Schedule
               </Link>
-            </Button>
-          )}
-          {["draft", "internal-review"].includes(estimate.status) && (
-            <Button asChild size="sm" className="h-8 px-3 text-xs bg-blue-500 hover:bg-blue-600 rounded-lg">
-              <Link href={`/estimates/${estimate.id}`}>
-                <Edit className="mr-1 h-3 w-3" />
-                Edit
-              </Link>
-            </Button>
-          )}
-          {estimate.status === "sent-to-customer" && (
-            <Button size="sm" className="h-8 px-3 text-xs bg-purple-500 hover:bg-purple-600 rounded-lg">
-              <Send className="mr-1 h-3 w-3" />
-              Follow Up
             </Button>
           )}
         </div>

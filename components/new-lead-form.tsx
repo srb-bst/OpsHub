@@ -27,11 +27,38 @@ export function NewLeadForm() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle form submission
-    console.log("Form submitted")
-    // In a real app, this would save to database
+
+    try {
+      // Get form data
+      const formData = new FormData(e.target as HTMLFormElement)
+      const leadData = {
+        customer_name: `${formData.get("firstName")} ${formData.get("lastName")}`,
+        customer_phone: formData.get("phone"),
+        customer_email: formData.get("email"),
+        customer_address: formData.get("address"),
+        source: leadSource,
+        services: services,
+        description: formData.get("description"),
+        budget_range: formData.get("budget"),
+        timeline: formData.get("timeline"),
+        priority: formData.get("priority") || "medium",
+        status: "new",
+        notes: formData.get("notes"),
+      }
+
+      console.log("Creating lead:", leadData)
+
+      // TODO: Save to database
+      // const { data, error } = await supabase.from('leads').insert(leadData)
+
+      // For now, just redirect back to leads
+      window.location.href = "/leads"
+    } catch (error) {
+      console.error("Error creating lead:", error)
+      alert("Error creating lead. Please try again.")
+    }
   }
 
   return (
@@ -114,6 +141,7 @@ export function NewLeadForm() {
                   </Label>
                   <Input
                     id="firstName"
+                    name="firstName"
                     placeholder="First name"
                     className="h-12 text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                   />
@@ -124,6 +152,7 @@ export function NewLeadForm() {
                   </Label>
                   <Input
                     id="lastName"
+                    name="lastName"
                     placeholder="Last name"
                     className="h-12 text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                   />
@@ -137,6 +166,7 @@ export function NewLeadForm() {
                   </Label>
                   <Input
                     id="phone"
+                    name="phone"
                     type="tel"
                     placeholder="(555) 123-4567"
                     className="h-12 text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
@@ -148,6 +178,7 @@ export function NewLeadForm() {
                   </Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     placeholder="customer@example.com"
                     className="h-12 text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
@@ -163,6 +194,7 @@ export function NewLeadForm() {
                   <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="address"
+                    name="address"
                     placeholder="123 Main Street, City, State, ZIP"
                     className="pl-10 h-12 text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                   />
@@ -218,7 +250,7 @@ export function NewLeadForm() {
                   <Label htmlFor="timeline" className="text-sm font-medium text-slate-700">
                     Desired Timeline
                   </Label>
-                  <Select>
+                  <Select name="timeline">
                     <SelectTrigger className="h-12 text-base rounded-lg border-slate-200">
                       <SelectValue placeholder="Select timeline" />
                     </SelectTrigger>
@@ -235,7 +267,7 @@ export function NewLeadForm() {
                   <Label htmlFor="budget" className="text-sm font-medium text-slate-700">
                     Budget Range
                   </Label>
-                  <Select>
+                  <Select name="budget">
                     <SelectTrigger className="h-12 text-base rounded-lg border-slate-200">
                       <SelectValue placeholder="Select budget range" />
                     </SelectTrigger>
@@ -256,6 +288,7 @@ export function NewLeadForm() {
                 </Label>
                 <Textarea
                   id="description"
+                  name="description"
                   placeholder="Describe what the customer is looking for..."
                   rows={4}
                   className="text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
@@ -289,7 +322,7 @@ export function NewLeadForm() {
             <CardContent className="p-4 lg:p-6 pt-0 space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-slate-700">Priority Level</Label>
-                <RadioGroup defaultValue="medium" className="flex gap-6">
+                <RadioGroup name="priority" defaultValue="medium" className="flex gap-6">
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="low" id="low" />
                     <Label htmlFor="low" className="text-sm font-medium cursor-pointer flex items-center gap-2">
@@ -320,6 +353,7 @@ export function NewLeadForm() {
                 </Label>
                 <Textarea
                   id="notes"
+                  name="notes"
                   placeholder="Add any additional notes about this lead..."
                   rows={3}
                   className="text-base rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"

@@ -1,5 +1,9 @@
 "use client"
 
+import { Textarea } from "@/components/ui/textarea"
+
+import { Input } from "@/components/ui/input"
+
 import type React from "react"
 
 import { useState, useEffect } from "react"
@@ -36,6 +40,15 @@ interface SchedulingProject {
   specialRequirements?: string
   blueSheetId: string
   estimateId: string
+}
+
+interface ConsultationScheduling {
+  leadId: string
+  title: string
+  customer: string
+  phone: string
+  address: string
+  services: string
 }
 
 interface CrewMember {
@@ -105,17 +118,42 @@ export function CalendarView() {
   const [showEventDetails, setShowEventDetails] = useState(false)
   const [showNewEventDialog, setShowNewEventDialog] = useState(false)
   const [showProjectSchedulingDialog, setShowProjectSchedulingDialog] = useState(false)
+  const [showConsultationDialog, setShowConsultationDialog] = useState(false)
+  const [showLeadDetailsDialog, setShowLeadDetailsDialog] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
   const [schedulingProject, setSchedulingProject] = useState<SchedulingProject | null>(null)
+  const [consultationScheduling, setConsultationScheduling] = useState<ConsultationScheduling | null>(null)
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
   // Check for scheduling parameters
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
-    const scheduleId = urlParams.get("schedule")
+    const scheduleType = urlParams.get("schedule")
+    const scheduleId = urlParams.get("scheduleId")
     const projectName = urlParams.get("project")
 
-    if (scheduleId && projectName) {
-      // Mock project data - in real app this would come from API
+    // Handle consultation scheduling
+    if (scheduleType === "consultation") {
+      const title = urlParams.get("title")
+      const customer = urlParams.get("customer")
+      const phone = urlParams.get("phone")
+      const address = urlParams.get("address")
+      const services = urlParams.get("services")
+      const leadId = urlParams.get("leadId")
+
+      if (title && customer && leadId) {
+        setConsultationScheduling({
+          leadId,
+          title: decodeURIComponent(title),
+          customer: decodeURIComponent(customer),
+          phone: phone ? decodeURIComponent(phone) : "",
+          address: address ? decodeURIComponent(address) : "",
+          services: services ? decodeURIComponent(services) : "",
+        })
+      }
+    }
+    // Handle project scheduling
+    else if (scheduleId && projectName) {
       const mockProject: SchedulingProject = {
         id: scheduleId,
         customerName: decodeURIComponent(projectName),
@@ -134,12 +172,22 @@ export function CalendarView() {
   }, [])
 
   const handleEventClick = (event) => {
-    setSelectedEvent(event)
-    setShowEventDetails(true)
+    // Check if this is a consultation event with lead info
+    if (event.leadId) {
+      setSelectedLeadId(event.leadId)
+      setShowLeadDetailsDialog(true)
+    } else {
+      setSelectedEvent(event)
+      setShowEventDetails(true)
+    }
   }
 
   const handleDateClick = (date) => {
-    if (schedulingProject) {
+    if (consultationScheduling) {
+      // Handle consultation scheduling
+      setSelectedDate(date)
+      setShowConsultationDialog(true)
+    } else if (schedulingProject) {
       // Handle project scheduling
       setSelectedDate(date)
       setShowProjectSchedulingDialog(true)
@@ -148,6 +196,22 @@ export function CalendarView() {
       setSelectedDate(date)
       setShowNewEventDialog(true)
     }
+  }
+
+  const handleConsultationScheduled = (scheduleData) => {
+    console.log("Consultation scheduled:", scheduleData)
+
+    // Show success message
+    alert(
+      `Consultation with ${consultationScheduling?.customer} has been scheduled for June ${selectedDate} at ${scheduleData.time}. Outlook calendar event created and notifications sent.`,
+    )
+
+    // Clear scheduling mode
+    setConsultationScheduling(null)
+    setShowConsultationDialog(false)
+
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname)
   }
 
   const handleProjectScheduled = (scheduleData) => {
@@ -168,6 +232,7 @@ export function CalendarView() {
 
   const cancelScheduling = () => {
     setSchedulingProject(null)
+    setConsultationScheduling(null)
     window.history.replaceState({}, document.title, window.location.pathname)
   }
 
@@ -196,10 +261,10 @@ export function CalendarView() {
       isToday ? "ring-2 ring-emerald-500 bg-emerald-50/30" : ""
     }`
 
-    if (schedulingProject) {
-      if (availability.availableCrews === 0) {
+    if (schedulingProject || consultationScheduling) {
+      if (availability.availableCrews === 0 && schedulingProject) {
         className += " hover:bg-red-100 border-red-200 bg-red-50/30"
-      } else if (availability.hasConflicts) {
+      } else if (availability.hasConflicts && schedulingProject) {
         className += " hover:bg-yellow-100 border-yellow-200 bg-yellow-50/30"
       } else {
         className += " hover:bg-emerald-100 hover:border-emerald-300 bg-emerald-50/20"
@@ -255,7 +320,7 @@ export function CalendarView() {
         </div>
       </div>
 
-      {/* Enhanced Scheduling Banner */}
+      {/* Enhanced Scheduling Banner for Projects */}
       {schedulingProject && (
         <Card className="mb-6 border-emerald-200 bg-emerald-50">
           <CardHeader className="pb-3">
@@ -322,6 +387,47 @@ export function CalendarView() {
         </Card>
       )}
 
+      {/* Consultation Scheduling Banner */}
+      {consultationScheduling && (
+        <Card className="mb-6 border-blue-200 bg-blue-50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <User className="h-6 w-6 text-blue-600" />
+                <div>
+                  <CardTitle className="text-blue-900">
+                    Scheduling Consultation: {consultationScheduling.customer}
+                  </CardTitle>
+                  <p className="text-sm text-blue-800 mt-1">Services: {consultationScheduling.services}</p>
+                </div>
+              </div>
+              <Button
+                onClick={cancelScheduling}
+                variant="outline"
+                size="sm"
+                className="border-blue-200 text-blue-700 hover:bg-blue-100"
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="flex items-center gap-2 text-sm text-blue-800">
+                <MapPin className="h-4 w-4" />
+                <span>{consultationScheduling.address}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-blue-800">
+                <Phone className="h-4 w-4" />
+                <span>{consultationScheduling.phone}</span>
+              </div>
+            </div>
+            <div className="text-sm text-blue-800">Click any available date to schedule this consultation</div>
+          </CardContent>
+        </Card>
+      )}
+
       {viewType === "month" && (
         <div className="grid grid-cols-7 gap-2">
           {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
@@ -358,11 +464,11 @@ export function CalendarView() {
                     </span>
 
                     {/* Availability indicators for scheduling mode */}
-                    {schedulingProject && (
+                    {(schedulingProject || consultationScheduling) && (
                       <div className="flex items-center gap-1">
-                        {availability.availableCrews === 0 ? (
+                        {schedulingProject && availability.availableCrews === 0 ? (
                           <AlertTriangle className="h-4 w-4 text-red-500" />
-                        ) : availability.hasConflicts ? (
+                        ) : schedulingProject && availability.hasConflicts ? (
                           <Clock className="h-4 w-4 text-yellow-500" />
                         ) : (
                           <CheckCircle className="h-4 w-4 text-emerald-500" />
@@ -371,7 +477,7 @@ export function CalendarView() {
                     )}
                   </div>
 
-                  {/* Crew availability info for scheduling */}
+                  {/* Crew availability info for project scheduling */}
                   {schedulingProject && (
                     <div className="mb-2 text-xs">
                       <div
@@ -404,9 +510,15 @@ export function CalendarView() {
                         time="8:00 AM"
                         title="Johnson Consultation"
                         type="consultation"
+                        leadId="1"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleEventClick({ time: "8:00 AM", title: "Johnson Consultation", type: "consultation" })
+                          handleEventClick({
+                            time: "8:00 AM",
+                            title: "Johnson Consultation",
+                            type: "consultation",
+                            leadId: "1",
+                          })
                         }}
                       />
                       <CalendarEvent
@@ -448,9 +560,15 @@ export function CalendarView() {
                         time="3:30 PM"
                         title="Williams Design Review"
                         type="consultation"
+                        leadId="3"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleEventClick({ time: "3:30 PM", title: "Williams Design Review", type: "consultation" })
+                          handleEventClick({
+                            time: "3:30 PM",
+                            title: "Williams Design Review",
+                            type: "consultation",
+                            leadId: "3",
+                          })
                         }}
                       />
                     </div>
@@ -492,9 +610,15 @@ export function CalendarView() {
                         time="1:00 PM"
                         title="Miller Design Review"
                         type="consultation"
+                        leadId="4"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleEventClick({ time: "1:00 PM", title: "Miller Design Review", type: "consultation" })
+                          handleEventClick({
+                            time: "1:00 PM",
+                            title: "Miller Design Review",
+                            type: "consultation",
+                            leadId: "4",
+                          })
                         }}
                       />
                     </div>
@@ -548,6 +672,19 @@ export function CalendarView() {
         </DialogContent>
       </Dialog>
 
+      {/* Lead Details Dialog */}
+      <Dialog open={showLeadDetailsDialog} onOpenChange={setShowLeadDetailsDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Lead Details</DialogTitle>
+            <DialogDescription>Consultation details and lead information</DialogDescription>
+          </DialogHeader>
+          {selectedLeadId && (
+            <LeadDetailsPopup leadId={selectedLeadId} onClose={() => setShowLeadDetailsDialog(false)} />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* New Event Dialog */}
       <Dialog open={showNewEventDialog} onOpenChange={setShowNewEventDialog}>
         <DialogContent className="sm:max-w-[500px]">
@@ -558,6 +695,26 @@ export function CalendarView() {
             </DialogDescription>
           </DialogHeader>
           <NewEventForm selectedDate={selectedDate} onClose={() => setShowNewEventDialog(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Consultation Scheduling Dialog */}
+      <Dialog open={showConsultationDialog} onOpenChange={setShowConsultationDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Schedule Consultation</DialogTitle>
+            <DialogDescription>
+              Schedule consultation with {consultationScheduling?.customer} for June {selectedDate}
+            </DialogDescription>
+          </DialogHeader>
+          {consultationScheduling && selectedDate && (
+            <ConsultationSchedulingForm
+              consultation={consultationScheduling}
+              selectedDate={selectedDate}
+              onSchedule={handleConsultationScheduled}
+              onClose={() => setShowConsultationDialog(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -589,21 +746,23 @@ export function CalendarView() {
   )
 }
 
-// Rest of the component code remains the same...
+// Calendar Event Component with Lead ID support
 interface CalendarEventProps {
   time: string
   title: string
   type: "consultation" | "installation" | "job"
+  leadId?: string
   onClick?: (e: React.MouseEvent) => void
 }
 
-function CalendarEvent({ time, title, type, onClick }: CalendarEventProps) {
+function CalendarEvent({ time, title, type, leadId, onClick }: CalendarEventProps) {
   return (
     <div className="text-sm p-2 rounded cursor-pointer hover:bg-accent transition-colors" onClick={onClick}>
       {type === "consultation" && (
-        <div className="bg-blue-100 text-blue-800 p-2 rounded">
+        <div className={`bg-blue-100 text-blue-800 p-2 rounded ${leadId ? "ring-2 ring-blue-300" : ""}`}>
           <div className="font-medium">{time}</div>
           <div className="truncate">{title}</div>
+          {leadId && <div className="text-xs opacity-75">Click for lead details</div>}
         </div>
       )}
       {type === "installation" && (
@@ -619,6 +778,195 @@ function CalendarEvent({ time, title, type, onClick }: CalendarEventProps) {
         </div>
       )}
     </div>
+  )
+}
+
+// Lead Details Popup Component
+interface LeadDetailsPopupProps {
+  leadId: string
+  onClose: () => void
+}
+
+function LeadDetailsPopup({ leadId, onClose }: LeadDetailsPopupProps) {
+  // Mock lead data - in real app this would come from API
+  const mockLeads = {
+    "1": {
+      name: "Sarah Johnson",
+      phone: "(555) 123-4567",
+      email: "sarah.johnson@email.com",
+      address: "123 Oak Street, Springfield",
+      services: ["Design", "Installation"],
+      description: "Looking for front yard redesign with low-maintenance plants",
+      status: "consultation-needed",
+      priority: "high",
+    },
+    "3": {
+      name: "Jennifer Martinez",
+      phone: "(555) 345-6789",
+      email: "jennifer.martinez@email.com",
+      address: "789 Pine Road, Springfield",
+      services: ["Design", "Hardscape"],
+      description: "Complete backyard renovation including patio and landscaping",
+      status: "consultation-needed",
+      priority: "high",
+    },
+    "4": {
+      name: "Robert Wilson",
+      phone: "(555) 456-7890",
+      email: "robert.wilson@email.com",
+      address: "321 Cedar Lane, Springfield",
+      services: ["Design", "Installation"],
+      description: "Interested in drought-resistant landscaping for large property",
+      status: "consultation-needed",
+      priority: "medium",
+    },
+  }
+
+  const lead = mockLeads[leadId]
+
+  if (!lead) {
+    return <div>Lead not found</div>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4">
+        <div>
+          <h3 className="font-semibold text-lg">{lead.name}</h3>
+          <div className="text-sm text-slate-600 space-y-1">
+            <div className="flex items-center gap-2">
+              <Phone className="h-3 w-3" />
+              {lead.phone}
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-3 w-3" />
+              {lead.address}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-slate-700">Services Requested</label>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {lead.services.map((service) => (
+              <span key={service} className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-md font-medium">
+                {service}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-slate-700">Description</label>
+          <p className="mt-1 text-sm text-slate-900">{lead.description}</p>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <Button
+            className="flex-1 h-10 bg-emerald-500 hover:bg-emerald-600"
+            onClick={() => window.open(`/leads/${leadId}`, "_blank")}
+          >
+            View Full Lead Details
+          </Button>
+          <Button variant="outline" onClick={onClose} className="flex-1 h-10">
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Consultation Scheduling Form Component
+interface ConsultationSchedulingFormProps {
+  consultation: ConsultationScheduling
+  selectedDate: number
+  onSchedule: (data: any) => void
+  onClose: () => void
+}
+
+function ConsultationSchedulingForm({
+  consultation,
+  selectedDate,
+  onSchedule,
+  onClose,
+}: ConsultationSchedulingFormProps) {
+  const [formData, setFormData] = useState({
+    time: "",
+    duration: "1hour",
+    notes: "",
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSchedule({
+      ...formData,
+      date: selectedDate,
+      customer: consultation.customer,
+      leadId: consultation.leadId,
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h3 className="font-medium text-blue-900">{consultation.title}</h3>
+        <div className="text-sm text-blue-800 mt-1">
+          <div>{consultation.address}</div>
+          <div>{consultation.phone}</div>
+          <div>Services: {consultation.services}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm font-medium text-slate-700">Time</label>
+          <Input
+            type="time"
+            value={formData.time}
+            onChange={(e) => setFormData((prev) => ({ ...prev, time: e.target.value }))}
+            required
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium text-slate-700">Duration</label>
+          <Select
+            value={formData.duration}
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, duration: value }))}
+          >
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30min">30 minutes</SelectItem>
+              <SelectItem value="1hour">1 hour</SelectItem>
+              <SelectItem value="2hours">2 hours</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium text-slate-700">Notes</label>
+        <Textarea
+          value={formData.notes}
+          onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+          placeholder="Special instructions or preparation notes..."
+          rows={3}
+          className="mt-1"
+        />
+      </div>
+
+      <div className="flex gap-3 pt-4">
+        <Button type="button" variant="outline" onClick={onClose} className="flex-1 h-10">
+          Cancel
+        </Button>
+        <Button type="submit" className="flex-1 h-10 bg-emerald-500 hover:bg-emerald-600" disabled={!formData.time}>
+          Schedule Consultation
+        </Button>
+      </div>
+    </form>
   )
 }
 
